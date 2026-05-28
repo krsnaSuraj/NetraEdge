@@ -1,35 +1,17 @@
-{
- "nbformat": 4,
- "nbformat_minor": 0,
- "metadata": {
-  "accelerator": "GPU",
-  "colab": {
-   "gpuType": "T4",
-   "provenance": []
-  },
-  "kernelspec": {
-   "display_name": "Python 3",
-   "name": "python3"
-  },
-  "language_info": {
-   "name": "python"
-  }
- },
- "cells": [
-  {
-   "cell_type": "markdown",
-   "metadata": {},
-   "source": [
+import json
+
+cells = []
+
+# Cell 0: Markdown header
+cells.append({"cell_type": "markdown", "metadata": {}, "source": [
     "# NetraEdge Training\n",
     "1. Runtime > Change runtime type > **GPU**\n",
     "2. Runtime > Run all\n",
     "3. Download .onnx files from output"
-   ]
-  },
-  {
-   "cell_type": "code",
-   "metadata": {},
-   "source": [
+]})
+
+# Cell 1: Setup
+cells.append({"cell_type": "code", "metadata": {}, "source": [
     "!pip install -q onnx onnxscript tqdm\n",
     "import torch, torch.nn as nn, torch.nn.functional as F\n",
     "import os, time, random\n",
@@ -44,14 +26,10 @@
     "    print('GPU:', props.name)\n",
     "    vram_gb = round(props.total_memory / 1e9, 1)\n",
     "    print('VRAM:', vram_gb, 'GB')"
-   ],
-   "outputs": [],
-   "execution_count": null
-  },
-  {
-   "cell_type": "code",
-   "metadata": {},
-   "source": [
+], "outputs": [], "execution_count": None})
+
+# Cell 2: MobileFaceNet
+cells.append({"cell_type": "code", "metadata": {}, "source": [
     "class DWSep(nn.Module):\n",
     "    def __init__(s, ic, oc, st=1):\n",
     "        super().__init__()\n",
@@ -103,14 +81,10 @@
     "\n",
     "m = MobileFaceNet(128)\n",
     "print('MobileFaceNet:', sum(p.numel() for p in m.parameters()), 'params')"
-   ],
-   "outputs": [],
-   "execution_count": null
-  },
-  {
-   "cell_type": "code",
-   "metadata": {},
-   "source": [
+], "outputs": [], "execution_count": None})
+
+# Cell 3: Dataset
+cells.append({"cell_type": "code", "metadata": {}, "source": [
     "class FaceDataset(Dataset):\n",
     "    def __init__(s, n_id=50, n_img=20, aug=True):\n",
     "        s.samples = []\n",
@@ -143,14 +117,10 @@
     "tr_dl = DataLoader(tr, 32, shuffle=True, num_workers=2, pin_memory=True)\n",
     "va_dl = DataLoader(va, 32, shuffle=False, num_workers=2)\n",
     "print('Train:', len(tr), 'Val:', len(va))"
-   ],
-   "outputs": [],
-   "execution_count": null
-  },
-  {
-   "cell_type": "code",
-   "metadata": {},
-   "source": [
+], "outputs": [], "execution_count": None})
+
+# Cell 4: Train recognition
+cells.append({"cell_type": "code", "metadata": {}, "source": [
     "from tqdm import tqdm\n",
     "\n",
     "model = MobileFaceNet(128).to(DEVICE)\n",
@@ -189,14 +159,10 @@
     "        best = va_acc\n",
     "        torch.save(model.state_dict(), 'rec_best.pt')\n",
     "print('Best:', round(best,1), '%')"
-   ],
-   "outputs": [],
-   "execution_count": null
-  },
-  {
-   "cell_type": "code",
-   "metadata": {},
-   "source": [
+], "outputs": [], "execution_count": None})
+
+# Cell 5: Export recognition
+cells.append({"cell_type": "code", "metadata": {}, "source": [
     "model.cpu().eval()\n",
     "torch.onnx.export(model, torch.randn(1, 3, 112, 112),\n",
     "    'face_recognition.onnx', input_names=['input'],\n",
@@ -205,14 +171,10 @@
     "print('face_recognition.onnx:', round(sz, 1), 'MB')\n",
     "from google.colab import files\n",
     "files.download('face_recognition.onnx')"
-   ],
-   "outputs": [],
-   "execution_count": null
-  },
-  {
-   "cell_type": "code",
-   "metadata": {},
-   "source": [
+], "outputs": [], "execution_count": None})
+
+# Cell 6: LivenessCNN
+cells.append({"cell_type": "code", "metadata": {}, "source": [
     "class LivBlock(nn.Module):\n",
     "    def __init__(s, ic, oc, st=1):\n",
     "        super().__init__()\n",
@@ -271,14 +233,10 @@
     "        return (t - mean) / std, label\n",
     "\n",
     "print('LivenessCNN:', sum(p.numel() for p in LivenessCNN(3).parameters()), 'params')"
-   ],
-   "outputs": [],
-   "execution_count": null
-  },
-  {
-   "cell_type": "code",
-   "metadata": {},
-   "source": [
+], "outputs": [], "execution_count": None})
+
+# Cell 7: Train liveness
+cells.append({"cell_type": "code", "metadata": {}, "source": [
     "tr2 = LivDataset(3000)\n",
     "va2 = LivDataset(600)\n",
     "tr2_dl = DataLoader(tr2, 64, shuffle=True, num_workers=2, pin_memory=True)\n",
@@ -320,14 +278,10 @@
     "        best = va_acc\n",
     "        torch.save(livmodel.state_dict(), 'liv_best.pt')\n",
     "print('Best:', round(best,1), '%')"
-   ],
-   "outputs": [],
-   "execution_count": null
-  },
-  {
-   "cell_type": "code",
-   "metadata": {},
-   "source": [
+], "outputs": [], "execution_count": None})
+
+# Cell 8: Export liveness
+cells.append({"cell_type": "code", "metadata": {}, "source": [
     "livmodel.cpu().eval()\n",
     "torch.onnx.export(livmodel, torch.randn(1, 3, 112, 112),\n",
     "    'liveness_detector.onnx', input_names=['input'],\n",
@@ -336,23 +290,49 @@
     "print('liveness_detector.onnx:', round(sz, 1), 'MB')\n",
     "from google.colab import files\n",
     "files.download('liveness_detector.onnx')"
-   ],
-   "outputs": [],
-   "execution_count": null
-  },
-  {
-   "cell_type": "code",
-   "metadata": {},
-   "source": [
+], "outputs": [], "execution_count": None})
+
+# Cell 9: Summary
+cells.append({"cell_type": "code", "metadata": {}, "source": [
     "r = os.path.getsize('face_recognition.onnx') / 1e6\n",
     "l = os.path.getsize('liveness_detector.onnx') / 1e6\n",
     "print('face_recognition.onnx:', round(r, 1), 'MB')\n",
     "print('liveness_detector.onnx:', round(l, 1), 'MB')\n",
     "print('Total:', round(r + l, 1), 'MB')\n",
     "print('Place in F:/PROJECTS/NetraEdge/models/')"
-   ],
-   "outputs": [],
-   "execution_count": null
-  }
- ]
+], "outputs": [], "execution_count": None})
+
+nb = {
+    "nbformat": 4, "nbformat_minor": 0,
+    "metadata": {
+        "accelerator": "GPU",
+        "colab": {"gpuType": "T4", "provenance": []},
+        "kernelspec": {"display_name": "Python 3", "name": "python3"},
+        "language_info": {"name": "python"}
+    },
+    "cells": cells
 }
+
+path = r'F:\PROJECTS\NetraEdge\training\NetraEdge_Train.ipynb'
+with open(path, 'w', encoding='utf-8') as f:
+    json.dump(nb, f, indent=1)
+
+# Verify
+with open(path) as f:
+    data = f.read()
+    nb_check = json.loads(data)
+
+# Final verification
+errors = []
+for i, cell in enumerate(nb_check['cells']):
+    src = ''.join(cell.get('source', []))
+    if 'total_mem' in src and 'total_memory' not in src:
+        errors.append(f'Cell {i}: has total_mem')
+    if 'total_memoryory' in src:
+        errors.append(f'Cell {i}: has total_memoryory')
+
+if errors:
+    print('ERRORS:', errors)
+else:
+    print('NetraEdge_Train.ipynb created - NO ERRORS')
+    print('Cells:', len(nb_check['cells']))
