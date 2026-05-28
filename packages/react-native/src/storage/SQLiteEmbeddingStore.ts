@@ -15,7 +15,6 @@
 
 import type {
   EmbeddingStore,
-  Enrollment,
   IdentificationResult,
 } from '@netraedge/core';
 

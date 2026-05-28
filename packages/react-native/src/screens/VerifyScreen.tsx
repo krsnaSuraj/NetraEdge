@@ -30,7 +30,7 @@ export function VerifyScreen({
   onBack: () => void;
 }): React.JSX.Element {
   const { pipeline, syncManager } = useAppContext();
-  const { state: recState, verify } = useFaceRecognition(pipeline);
+  const { verify } = useFaceRecognition(pipeline);
   const liveness = useLivenessCheck(
     pipeline ? (pipeline as unknown as { _liveness: import('@netraedge/core').LivenessOrchestrator })._liveness : null,
   );
