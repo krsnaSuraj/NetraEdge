@@ -1,0 +1,26 @@
+{
+  "name": "@netraedge/app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "NetraEdge demo application",
+  "main": "src/App.tsx",
+  "scripts": {
+    "start": "react-native start",
+    "android": "react-native run-android",
+    "ios": "react-native run-ios",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@netraedge/core": "workspace:*",
+    "@netraedge/react-native": "workspace:*",
+    "react": "^18.3.0",
+    "react-native": "^0.76.0",
+    "react-native-vision-camera": "^5.0.0",
+    "react-native-vision-camera-face-detector": "^2.0.0",
+    "react-native-fast-tflite": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.0",
+    "typescript": "^5.6.0"
+  }
+}

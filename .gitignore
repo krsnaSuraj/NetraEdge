@@ -1,0 +1,66 @@
+# Dependencies
+node_modules/
+.pnp.*
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# TFLite models (large binaries)
+models/*.tflite
+!models/README.md
+
+# Training artifacts
+training/checkpoints/
+training/logs/
+training/data/
+*.pt
+*.onnx
+*.tflite
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Expo
+.expo/
+*.jks
+*.p8
+*.p12
+*.mobileprovision
+
+# Android
+android/app/build/
+android/.gradle/
+android/local.properties
+
+# iOS
+ios/Pods/
+ios/build/
+ios/*.xcworkspace/xcuserdata/
