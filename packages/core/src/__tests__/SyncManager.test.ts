@@ -11,7 +11,7 @@ function createMockTransport(): SyncTransport {
 
 function createMockNetwork(isOnline: boolean): NetworkMonitor {
   const listeners: Array<(online: boolean) => void> = [];
-  return {
+  const monitor: NetworkMonitor & { simulateOnline: () => void; simulateOffline: () => void } = {
     isOnline: vi.fn().mockResolvedValue(isOnline),
     onConnectivityChange: vi.fn((cb: (online: boolean) => void) => {
       listeners.push(cb);
@@ -20,13 +20,14 @@ function createMockNetwork(isOnline: boolean): NetworkMonitor {
         if (idx >= 0) listeners.splice(idx, 1);
       };
     }),
-    _simulateOnline: () => {
+    simulateOnline: () => {
       for (const cb of listeners) cb(true);
     },
-    _simulateOffline: () => {
+    simulateOffline: () => {
       for (const cb of listeners) cb(false);
     },
   };
+  return monitor;
 }
 
 describe('DefaultSyncManager', () => {
