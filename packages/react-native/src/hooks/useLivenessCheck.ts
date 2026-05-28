@@ -1,11 +1,14 @@
 /**
  * useLivenessCheck — real-time liveness detection hook.
  *
- * Runs blink detection, texture analysis, and depth estimation
- * across video frames to determine if a face is live.
+ * Delegates to the core LivenessOrchestrator for blink detection,
+ * texture analysis, and depth estimation. Surfaces the combined
+ * liveness verdict to the React component layer.
  */
 
 import { useCallback, useRef, useState } from 'react';
+import type { LivenessOrchestrator } from '@netraedge/core';
+import type { Point3D } from '@netraedge/core';
 
 export interface LivenessState {
   readonly blinkDetected: boolean;
@@ -16,9 +19,9 @@ export interface LivenessState {
   readonly prompt: string | null;
 }
 
-export function useLivenessCheck(): {
+export function useLivenessCheck(orchestrator: LivenessOrchestrator | null): {
   state: LivenessState;
-  processFrame: (meshPoints: unknown[], faceData?: Uint8Array) => void;
+  processFrame: (meshPoints: Point3D[], faceData?: Float32Array) => Promise<void>;
   reset: () => void;
 } {
   const [state, setState] = useState<LivenessState>({
@@ -30,64 +33,47 @@ export function useLivenessCheck(): {
     prompt: 'Blink your eyes',
   });
 
-  const blinkCountRef = useRef(0);
-  const earHistoryRef = useRef<number[]>([]);
+  const processingRef = useRef(false);
 
   const processFrame = useCallback(
-    (meshPoints: unknown[], _faceData?: Uint8Array) => {
-      if (meshPoints.length < 468) return;
+    async (meshPoints: Point3D[], faceData?: Float32Array) => {
+      if (!orchestrator || processingRef.current) return;
+      processingRef.current = true;
 
-      const points = meshPoints as Array<{ x: number; y: number }>;
+      try {
+        const result = await orchestrator.processFrame(
+          faceData ?? new Float32Array(0),
+          meshPoints,
+          Date.now(),
+        );
 
-      const leftEye = [points[33], points[160], points[158], points[133], points[153], points[144]];
-      const rightEye = [points[362], points[385], points[387], points[263], points[373], points[380]];
+        const blinkDetected = result.blink.detected;
+        const blinkCount = orchestrator.blinkCount;
 
-      const computeEAR = (eye: Array<{ x: number; y: number } | undefined>): number => {
-        const [p1, p2, p3, p4, p5, p6] = eye;
-        if (!p1 || !p2 || !p3 || !p4 || !p5 || !p6) return 0.3;
-
-        const v1 = Math.hypot(p2.x - p6.x, p2.y - p6.y);
-        const v2 = Math.hypot(p3.x - p5.x, p3.y - p5.y);
-        const h = Math.hypot(p1.x - p4.x, p1.y - p4.y);
-
-        return h === 0 ? 0.3 : (v1 + v2) / (2 * h);
-      };
-
-      const leftEAR = computeEAR(leftEye);
-      const rightEAR = computeEAR(rightEye);
-      const avgEAR = (leftEAR + rightEAR) / 2;
-
-      earHistoryRef.current.push(avgEAR);
-      if (earHistoryRef.current.length > 30) earHistoryRef.current.shift();
-
-      const history = earHistoryRef.current;
-      const len = history.length;
-      if (len >= 3) {
-        const current = history[len - 1] ?? 0.3;
-        const prev = history[len - 2] ?? 0.3;
-        if (current < 0.21 && prev >= 0.21) {
-          blinkCountRef.current++;
+        let prompt = 'Blink your eyes';
+        if (result.verdict === 'live') {
+          prompt = 'Liveness verified';
+        } else if (blinkDetected) {
+          prompt = 'Hold still...';
         }
+
+        setState({
+          blinkDetected,
+          blinkCount,
+          textureScore: result.texture.realScore,
+          depthScore: result.depth.variance,
+          isLive: result.verdict === 'live',
+          prompt,
+        });
+      } finally {
+        processingRef.current = false;
       }
-
-      const blinkDetected = blinkCountRef.current >= 1;
-
-      setState((prev) => ({
-        ...prev,
-        blinkDetected,
-        blinkCount: blinkCountRef.current,
-        textureScore: blinkDetected ? 0.9 : prev.textureScore,
-        depthScore: blinkDetected ? 0.8 : prev.depthScore,
-        isLive: blinkDetected,
-        prompt: blinkDetected ? 'Liveness verified' : 'Blink your eyes',
-      }));
     },
-    [],
+    [orchestrator],
   );
 
   const reset = useCallback(() => {
-    blinkCountRef.current = 0;
-    earHistoryRef.current = [];
+    orchestrator?.reset();
     setState({
       blinkDetected: false,
       blinkCount: 0,
@@ -96,7 +82,7 @@ export function useLivenessCheck(): {
       isLive: false,
       prompt: 'Blink your eyes',
     });
-  }, []);
+  }, [orchestrator]);
 
   return { state, processFrame, reset };
 }

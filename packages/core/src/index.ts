@@ -83,3 +83,14 @@ export {
   type NetworkMonitor,
   DefaultSyncManager,
 } from './sync/SyncManager';
+export {
+  type SyncQueueItem,
+  type SyncQueue,
+  InMemorySyncQueue,
+} from './sync/SyncQueue';
+export {
+  type PurgePolicy,
+  type PurgeResult,
+  DEFAULT_PURGE_POLICY,
+  DataPurgeManager,
+} from './sync/DataPurge';

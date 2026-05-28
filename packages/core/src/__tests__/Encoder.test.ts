@@ -7,26 +7,26 @@ describe('StubEncoder', () => {
     expect(encoder.isLoaded).toBe(true);
   });
 
-  it('returns 128-d embedding by default', () => {
+  it('returns 128-d embedding by default', async () => {
     const encoder = new StubEncoder();
-    const faceData = new Uint8Array(112 * 112 * 3).fill(128);
-    const embedding = encoder.encode(faceData);
+    const faceData = new Float32Array(112 * 112 * 3).fill(0.5);
+    const embedding = await encoder.encode(faceData);
     expect(embedding).not.toBeNull();
     expect(embedding!.length).toBe(128);
   });
 
-  it('returns deterministic embeddings', () => {
+  it('returns deterministic embeddings', async () => {
     const encoder = new StubEncoder();
-    const faceData = new Uint8Array(112 * 112 * 3).fill(128);
-    const emb1 = encoder.encode(faceData);
-    const emb2 = encoder.encode(faceData);
+    const faceData = new Float32Array(112 * 112 * 3).fill(0.5);
+    const emb1 = await encoder.encode(faceData);
+    const emb2 = await encoder.encode(faceData);
     expect(emb1).toEqual(emb2);
   });
 
-  it('returns L2-normalized embedding', () => {
+  it('returns L2-normalized embedding', async () => {
     const encoder = new StubEncoder();
-    const faceData = new Uint8Array(112 * 112 * 3).fill(128);
-    const embedding = encoder.encode(faceData)!;
+    const faceData = new Float32Array(112 * 112 * 3).fill(0.5);
+    const embedding = (await encoder.encode(faceData))!;
 
     let magnitude = 0;
     for (let i = 0; i < embedding.length; i++) {
@@ -42,10 +42,10 @@ describe('StubEncoder', () => {
     expect(encoder.isLoaded).toBe(false);
   });
 
-  it('supports custom dimensions', () => {
+  it('supports custom dimensions', async () => {
     const encoder = new StubEncoder(64);
-    const faceData = new Uint8Array(112 * 112 * 3).fill(128);
-    const embedding = encoder.encode(faceData);
+    const faceData = new Float32Array(112 * 112 * 3).fill(0.5);
+    const embedding = await encoder.encode(faceData);
     expect(embedding!.length).toBe(64);
   });
 });

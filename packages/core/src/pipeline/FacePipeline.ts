@@ -73,7 +73,7 @@ export class FacePipeline {
    */
   async enroll(
     userId: string,
-    faceFrames: readonly Uint8Array[],
+    faceFrames: readonly Float32Array[],
     meshPoints: readonly Point3D[][],
     _timestampMs: number,
   ): Promise<Result<EnrollmentResult>> {
@@ -102,7 +102,7 @@ export class FacePipeline {
 
       if (!frame || !points) continue;
 
-      const embedding = this._encoder.encode(frame);
+      const embedding = await this._encoder.encode(frame);
       if (embedding) {
         embeddings.push(embedding);
         totalQuality += 1.0;
@@ -143,7 +143,7 @@ export class FacePipeline {
    * @returns Verification result
    */
   async verify(
-    faceData: Uint8Array,
+    faceData: Float32Array,
     meshPoints: Point3D[],
     timestampMs: number,
     skipLiveness = false,
@@ -167,7 +167,7 @@ export class FacePipeline {
     };
 
     if (this._liveness && !skipLiveness) {
-      livenessResult = this._liveness.processFrame(faceData, meshPoints, timestampMs);
+      livenessResult = await this._liveness.processFrame(faceData, meshPoints, timestampMs);
 
       if (livenessResult.verdict === LivenessVerdict.SPOOF) {
         return ok({
@@ -179,7 +179,7 @@ export class FacePipeline {
       }
     }
 
-    const embedding = this._encoder.encode(faceData);
+    const embedding = await this._encoder.encode(faceData);
     if (!embedding) {
       return err({
         code: ErrorCode.MODEL_INFERENCE_FAILED,

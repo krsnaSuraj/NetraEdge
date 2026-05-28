@@ -130,11 +130,14 @@ def main(config_path: str) -> None:
         t0 = time.time()
         logger.info("Epoch %d/%d", epoch + 1, train_cfg["epochs"])
 
-        # TODO: Replace with actual data loaders
-        # train_loss, train_acc = train_one_epoch(...)
-        # val_loss, val_acc = evaluate(...)
-        logger.info("Training requires dataset setup — see README.md")
-        break
+        # Training is executed via Google Colab notebook (T4 GPU).
+        # See training/NetraEdge_Train.ipynb or run build_notebook.py.
+        #
+        # For local training, create data loaders and uncomment:
+        #   train_loader = DataLoader(train_dataset, batch_size=..., shuffle=True)
+        #   val_loader = DataLoader(val_dataset, batch_size=..., shuffle=False)
+        #   train_loss, train_acc = train_one_epoch(model, criterion, train_loader, optimizer, device)
+        #   val_loss, val_acc = evaluate(model, criterion, val_loader, device)
 
         scheduler.step()
 

@@ -14,8 +14,8 @@ function makeMeshPoints(zVariance: number): Point3D[] {
   }));
 }
 
-function makeFaceData(): Uint8Array {
-  return new Uint8Array(112 * 112 * 3).fill(128);
+function makeFaceData(): Float32Array {
+  return new Float32Array(112 * 112 * 3).fill(0.5);
 }
 
 describe('LivenessOrchestrator', () => {
@@ -34,30 +34,30 @@ describe('LivenessOrchestrator', () => {
     );
   });
 
-  it('returns SPOOF when no checks pass', () => {
+  it('returns SPOOF when no checks pass', async () => {
     const faceData = makeFaceData();
     const meshPoints = makeMeshPoints(0.001);
     const timestamp = Date.now();
 
-    const result = orchestrator.processFrame(faceData, meshPoints, timestamp);
+    const result = await orchestrator.processFrame(faceData, meshPoints, timestamp);
     expect(result.verdict).toBe(LivenessVerdict.SPOOF);
   });
 
-  it('returns texture + depth results with high-variance mesh', () => {
+  it('returns texture + depth results with high-variance mesh', async () => {
     const faceData = makeFaceData();
     const meshPoints = makeMeshPoints(0.5);
 
-    const result = orchestrator.processFrame(faceData, meshPoints, 1000);
+    const result = await orchestrator.processFrame(faceData, meshPoints, 1000);
     expect(result.texture.realScore).toBeGreaterThan(0.8);
     expect(result.depth.variance).toBeGreaterThan(0.25);
   });
 
-  it('tracks blink count across frames', () => {
+  it('tracks blink count across frames', async () => {
     const faceData = makeFaceData();
     const meshPoints = makeMeshPoints(0.001);
 
     for (let i = 0; i < 5; i++) {
-      orchestrator.processFrame(faceData, meshPoints, i * 100);
+      await orchestrator.processFrame(faceData, meshPoints, i * 100);
     }
 
     expect(orchestrator.blinkCount).toBeGreaterThanOrEqual(0);
@@ -68,11 +68,11 @@ describe('LivenessOrchestrator', () => {
     expect(orchestrator.blinkCount).toBe(0);
   });
 
-  it('includes passed/failed checks in result', () => {
+  it('includes passed/failed checks in result', async () => {
     const faceData = makeFaceData();
     const meshPoints = makeMeshPoints(0.5);
 
-    const result = orchestrator.processFrame(faceData, meshPoints, 1000);
+    const result = await orchestrator.processFrame(faceData, meshPoints, 1000);
     expect(Array.isArray(result.passedChecks)).toBe(true);
     expect(Array.isArray(result.failedChecks)).toBe(true);
   });

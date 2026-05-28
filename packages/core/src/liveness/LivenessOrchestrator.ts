@@ -41,22 +41,22 @@ export class LivenessOrchestrator {
   }
 
   /**
-   * Run a single-frame liveness check (texture + depth).
+   * Run a single-frame liveness check (blink + texture + depth).
    *
    * For blink detection, call processBlinkFrame across multiple frames.
    *
-   * @param faceData - 112×112×3 RGB face crop
+   * @param faceData - 112×112×3 RGB face crop (normalized floats)
    * @param meshPoints - 478 face mesh points with z coordinates
    * @param timestampMs - Frame timestamp
    * @returns Liveness result (blink may be UNKNOWN on first frame)
    */
-  processFrame(
-    faceData: Uint8Array,
+  async processFrame(
+    faceData: Float32Array,
     meshPoints: readonly Point3D[],
     timestampMs: number,
-  ): LivenessResult {
+  ): Promise<LivenessResult> {
     const blink = this._blinkDetector.processFrame(meshPoints, timestampMs);
-    const texture = this._textureAnalyzer.analyze(faceData);
+    const texture = await this._textureAnalyzer.analyze(faceData);
     const depth = this._depthEstimator.analyze(meshPoints);
 
     return this.combineResults(blink, texture, depth);

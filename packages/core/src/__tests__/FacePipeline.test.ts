@@ -21,7 +21,7 @@ describe('FacePipeline', () => {
 
   it('enrolls a user successfully', async () => {
     const pipeline = createPipeline();
-    const faceData = new Uint8Array(112 * 112 * 3).fill(128);
+    const faceData = new Float32Array(112 * 112 * 3).fill(0.5);
     const meshPoints = [{ x: 0.5, y: 0.5, z: 0.5 }];
 
     const result = await pipeline.enroll(
@@ -46,7 +46,7 @@ describe('FacePipeline', () => {
 
   it('verifies a face against enrolled user', async () => {
     const pipeline = createPipeline();
-    const faceData = new Uint8Array(112 * 112 * 3).fill(128);
+    const faceData = new Float32Array(112 * 112 * 3).fill(0.5);
     const meshPoints = [{ x: 0.5, y: 0.5, z: 0.5 }];
 
     await pipeline.enroll(
@@ -72,7 +72,7 @@ describe('FacePipeline', () => {
 
   it('lists enrolled users', async () => {
     const pipeline = createPipeline();
-    const faceData = new Uint8Array(112 * 112 * 3).fill(128);
+    const faceData = new Float32Array(112 * 112 * 3).fill(0.5);
     const meshPoints = [{ x: 0.5, y: 0.5, z: 0.5 }];
 
     await pipeline.enroll('user1', [faceData], [meshPoints], Date.now());
@@ -85,7 +85,7 @@ describe('FacePipeline', () => {
 
   it('removes a user', async () => {
     const pipeline = createPipeline();
-    const faceData = new Uint8Array(112 * 112 * 3).fill(128);
+    const faceData = new Float32Array(112 * 112 * 3).fill(0.5);
     const meshPoints = [{ x: 0.5, y: 0.5, z: 0.5 }];
 
     await pipeline.enroll('user1', [faceData], [meshPoints], Date.now());
@@ -98,7 +98,7 @@ describe('FacePipeline', () => {
 
   it('clears all enrollments', async () => {
     const pipeline = createPipeline();
-    const faceData = new Uint8Array(112 * 112 * 3).fill(128);
+    const faceData = new Float32Array(112 * 112 * 3).fill(0.5);
     const meshPoints = [{ x: 0.5, y: 0.5, z: 0.5 }];
 
     await pipeline.enroll('user1', [faceData], [meshPoints], Date.now());
@@ -112,7 +112,7 @@ describe('FacePipeline', () => {
     const pipeline = createPipeline();
     expect(await pipeline.enrollmentCount()).toBe(0);
 
-    const faceData = new Uint8Array(112 * 112 * 3).fill(128);
+    const faceData = new Float32Array(112 * 112 * 3).fill(0.5);
     const meshPoints = [{ x: 0.5, y: 0.5, z: 0.5 }];
 
     await pipeline.enroll('user1', [faceData], [meshPoints], Date.now());

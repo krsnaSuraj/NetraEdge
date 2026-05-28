@@ -14,7 +14,7 @@ import type { TextureResult } from '../types/Liveness';
 
 export interface TextureAnalyzer {
   /** Analyze a face crop for texture-based liveness */
-  analyze(faceData: Uint8Array): TextureResult;
+  analyze(faceData: Float32Array): Promise<TextureResult>;
 
   readonly isLoaded: boolean;
   dispose(): void;
@@ -22,14 +22,18 @@ export interface TextureAnalyzer {
 
 /**
  * TFLite-backed texture analyzer.
- * Input: 112×112×3 RGB face crop
+ * Input: 112×112×3 RGB face crop (float array, normalized 0–1)
  * Output: 3-class softmax [real, print, screen]
  */
 export class CNNTextureAnalyzer implements TextureAnalyzer {
   private _isLoaded = false;
-  private _nativeModule: unknown;
+  private readonly _nativeModule: {
+    runLiveness(pixels: number[]): Promise<number[] | null>;
+  };
 
-  constructor(nativeModule: unknown) {
+  constructor(nativeModule: {
+    runLiveness(pixels: number[]): Promise<number[] | null>;
+  }) {
     this._nativeModule = nativeModule;
     this._isLoaded = true;
   }
@@ -38,16 +42,15 @@ export class CNNTextureAnalyzer implements TextureAnalyzer {
     return this._isLoaded;
   }
 
-  analyze(faceData: Uint8Array): TextureResult {
+  async analyze(faceData: Float32Array): Promise<TextureResult> {
     if (!this._isLoaded) {
       return { realScore: 0, printScore: 0, screenScore: 0 };
     }
 
     try {
-      const module = this._nativeModule as {
-        runInference(input: Uint8Array): Float32Array | null;
-      };
-      const output = module.runInference(faceData);
+      const output = await this._nativeModule.runLiveness(
+        Array.from(faceData),
+      );
 
       if (!output || output.length < 3) {
         return { realScore: 0, printScore: 0, screenScore: 0 };
@@ -65,7 +68,6 @@ export class CNNTextureAnalyzer implements TextureAnalyzer {
 
   dispose(): void {
     this._isLoaded = false;
-    this._nativeModule = null;
   }
 }
 
@@ -77,7 +79,7 @@ export class StubTextureAnalyzer implements TextureAnalyzer {
     return true;
   }
 
-  analyze(_faceData: Uint8Array): TextureResult {
+  async analyze(_faceData: Float32Array): Promise<TextureResult> {
     return {
       realScore: 0.95,
       printScore: 0.03,

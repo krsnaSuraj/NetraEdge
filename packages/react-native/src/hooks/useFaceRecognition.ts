@@ -7,6 +7,7 @@
 
 import { useCallback, useRef, useState } from 'react';
 import { FacePipeline } from '@netraedge/core';
+import type { Point3D } from '@netraedge/core';
 
 export interface RecognitionState {
   readonly isProcessing: boolean;
@@ -24,8 +25,8 @@ export interface VerificationResult {
 
 export function useFaceRecognition(pipeline: FacePipeline): {
   state: RecognitionState;
-  verify: (faceData: Uint8Array, meshPoints: unknown[]) => Promise<VerificationResult | null>;
-  enroll: (userId: string, frames: Uint8Array[]) => Promise<boolean>;
+  verify: (faceData: Float32Array, meshPoints: Point3D[]) => Promise<VerificationResult | null>;
+  enroll: (userId: string, frames: Float32Array[], meshPoints: Point3D[][]) => Promise<boolean>;
   refreshUsers: () => Promise<void>;
   reset: () => void;
 } {
@@ -39,13 +40,13 @@ export function useFaceRecognition(pipeline: FacePipeline): {
   const processingRef = useRef(false);
 
   const verify = useCallback(
-    async (faceData: Uint8Array, meshPoints: unknown[]): Promise<VerificationResult | null> => {
+    async (faceData: Float32Array, meshPoints: Point3D[]): Promise<VerificationResult | null> => {
       if (processingRef.current) return null;
       processingRef.current = true;
       setState((prev) => ({ ...prev, isProcessing: true, error: null }));
 
       try {
-        const result = await pipeline.verify(faceData, meshPoints as never[], Date.now());
+        const result = await pipeline.verify(faceData, meshPoints, Date.now());
         if (result.ok) {
           const vr: VerificationResult = {
             matched: result.value.matched,
@@ -69,11 +70,10 @@ export function useFaceRecognition(pipeline: FacePipeline): {
   );
 
   const enroll = useCallback(
-    async (userId: string, frames: Uint8Array[]): Promise<boolean> => {
+    async (userId: string, frames: Float32Array[], meshPoints: Point3D[][]): Promise<boolean> => {
       setState((prev) => ({ ...prev, isProcessing: true, error: null }));
       try {
-        const emptyMesh = frames.map(() => []);
-        const result = await pipeline.enroll(userId, frames, emptyMesh as never[], Date.now());
+        const result = await pipeline.enroll(userId, frames, meshPoints, Date.now());
         if (result.ok) {
           await refreshUsers();
           return true;

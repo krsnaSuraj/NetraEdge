@@ -17,23 +17,23 @@ export enum LivenessMode {
 
 const VALID_MODES = new Set(Object.values(LivenessMode));
 
-export function validateConfig(config: Partial<AppConfig>): NetraEdgeError | null {
+export function validateConfig(config: Partial<AppConfig>): ConfigError | null {
   if (config.recognitionThreshold !== undefined) {
     if (config.recognitionThreshold < 0 || config.recognitionThreshold > 1) {
-      return new NullError(
+      return new ConfigError(
         `recognitionThreshold must be 0.0–1.0, got ${config.recognitionThreshold}`,
       );
     }
   }
 
   if (config.livenessMode !== undefined && !VALID_MODES.has(config.livenessMode)) {
-    return new NullError(`Invalid livenessMode: ${config.livenessMode}`);
+    return new ConfigError(`Invalid livenessMode: ${config.livenessMode}`);
   }
 
   return null;
 }
 
-class NullError extends NetraEdgeError {
+class ConfigError extends NetraEdgeError {
   override code = ErrorCode.INVALID_CONFIG;
   override message: string;
 

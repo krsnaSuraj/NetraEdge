@@ -1,176 +1,141 @@
-package com.netraedge;
+package com.netraedge
 
-import android.content.Context;
-import android.util.Log;
-
-import org.tensorflow.lite.Interpreter;
-import org.tensorflow.lite.support.common.FileUtil;
-
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.FloatBuffer;
+import android.content.Context
+import android.util.Log
+import org.tensorflow.lite.Interpreter
+import org.tensorflow.lite.support.common.FileUtil
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 
 /**
- * NetraEdgeModule — React Native bridge for TFLite inference.
+ * NetraEdgeModule — TFLite inference engine for face recognition and liveness.
  *
- * Provides native methods for:
- * - Loading TFLite models from app assets
- * - Running face recognition inference (128-d embedding)
- * - Running liveness detection inference (3-class softmax)
- *
- * This module is loaded automatically by React Native's NativeModules system.
+ * Loads two TFLite models from app assets:
+ * - face_recognition.tflite → 128-d L2-normalized embedding
+ * - liveness_detector.tflite → 3-class softmax [real, print, screen]
  */
-public class NetraEdgeModule {
-    private static final String TAG = "NetraEdge";
+class NetraEdgeModule {
+    companion object {
+        private const val TAG = "NetraEdge"
+        private const val INPUT_SIZE = 112
+        private const val EMBEDDING_DIM = 128
+        private const val LIVENESS_CLASSES = 3
+    }
 
-    private Interpreter recognitionInterpreter;
-    private Interpreter livenessInterpreter;
-    private boolean isInitialized = false;
+    private var recognitionInterpreter: Interpreter? = null
+    private var livenessInterpreter: Interpreter? = null
+    private var initialized = false
 
-    private static final int INPUT_SIZE = 112;
-    private static final int EMBEDDING_DIM = 128;
-    private static final int LIVENESS_CLASSES = 3;
+    fun isInitialized(): Boolean = initialized
 
-    /**
-     * Initialize the module with TFLite models.
-     *
-     * @param context Android context (for accessing assets)
-     * @return true if initialization succeeded
-     */
-    public boolean initialize(Context context) {
-        try {
-            recognitionInterpreter = new Interpreter(
+    fun initialize(context: Context): Boolean {
+        return try {
+            recognitionInterpreter = Interpreter(
                 FileUtil.loadMappedFile(context, "face_recognition.tflite")
-            );
-            livenessInterpreter = new Interpreter(
+            )
+            livenessInterpreter = Interpreter(
                 FileUtil.loadMappedFile(context, "liveness_detector.tflite")
-            );
-            isInitialized = true;
-            Log.i(TAG, "TFLite models loaded successfully");
-            return true;
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to load TFLite models: " + e.getMessage());
-            return false;
+            )
+            initialized = true
+            Log.i(TAG, "TFLite models loaded successfully")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to load TFLite models: ${e.message}")
+            false
         }
     }
 
     /**
-     * Check if models are loaded and ready.
-     */
-    public boolean isInitialized() {
-        return isInitialized;
-    }
-
-    /**
-     * Run face recognition on a face crop.
+     * Run face recognition inference.
      *
-     * Input: 112x112x3 RGB image (normalized to 0-1)
+     * Input: 112×112×3 RGB image (normalized floats, 0–1)
      * Output: 128-dimensional L2-normalized embedding
-     *
-     * @param inputData Raw pixel data (112 * 112 * 3 floats)
-     * @return 128-d embedding array, or null on failure
      */
-    public float[] runRecognition(float[] inputData) {
-        if (!isInitialized || recognitionInterpreter == null) {
-            Log.e(TAG, "Recognition model not initialized");
-            return null;
+    fun runRecognition(inputData: FloatArray): FloatArray? {
+        val interpreter = recognitionInterpreter ?: run {
+            Log.e(TAG, "Recognition model not initialized")
+            return null
         }
+        if (!initialized) return null
 
-        try {
-            // Prepare input buffer
-            float[][][] input = new float[1][INPUT_SIZE][INPUT_SIZE * 3];
-            for (int y = 0; y < INPUT_SIZE; y++) {
-                for (int x = 0; x < INPUT_SIZE; x++) {
-                    int idx = (y * INPUT_SIZE + x) * 3;
-                    input[0][y][x * 3] = inputData[idx];
-                    input[0][y][x * 3 + 1] = inputData[idx + 1];
-                    input[0][y][x * 3 + 2] = inputData[idx + 2];
+        return try {
+            val input = Array(1) { Array(INPUT_SIZE) { FloatArray(INPUT_SIZE * 3) } }
+            for (y in 0 until INPUT_SIZE) {
+                for (x in 0 until INPUT_SIZE) {
+                    val idx = (y * INPUT_SIZE + x) * 3
+                    input[0][y][x * 3] = inputData[idx]
+                    input[0][y][x * 3 + 1] = inputData[idx + 1]
+                    input[0][y][x * 3 + 2] = inputData[idx + 2]
                 }
             }
 
-            // Run inference
-            float[][] output = new float[1][EMBEDDING_DIM];
-            recognitionInterpreter.run(input, output);
+            val output = Array(1) { FloatArray(EMBEDDING_DIM) }
+            interpreter.run(input, output)
 
-            // L2 normalize
-            float[] embedding = output[0];
-            float norm = 0;
-            for (float v : embedding) norm += v * v;
-            norm = (float) Math.sqrt(norm);
+            val embedding = output[0]
+            var norm = 0f
+            for (v in embedding) norm += v * v
+            norm = Math.sqrt(norm.toDouble()).toFloat()
             if (norm > 0) {
-                for (int i = 0; i < embedding.length; i++) {
-                    embedding[i] /= norm;
-                }
+                for (i in embedding.indices) embedding[i] /= norm
             }
 
-            return embedding;
-        } catch (Exception e) {
-            Log.e(TAG, "Recognition inference failed: " + e.getMessage());
-            return null;
+            embedding
+        } catch (e: Exception) {
+            Log.e(TAG, "Recognition inference failed: ${e.message}")
+            null
         }
     }
 
     /**
-     * Run liveness detection on a face crop.
+     * Run liveness detection inference.
      *
-     * Input: 112x112x3 RGB image (normalized to 0-1)
+     * Input: 112×112×3 RGB image (normalized floats, 0–1)
      * Output: 3-class probabilities [real, print, screen]
-     *
-     * @param inputData Raw pixel data (112 * 112 * 3 floats)
-     * @return 3-element probability array, or null on failure
      */
-    public float[] runLiveness(float[] inputData) {
-        if (!isInitialized || livenessInterpreter == null) {
-            Log.e(TAG, "Liveness model not initialized");
-            return null;
+    fun runLiveness(inputData: FloatArray): FloatArray? {
+        val interpreter = livenessInterpreter ?: run {
+            Log.e(TAG, "Liveness model not initialized")
+            return null
         }
+        if (!initialized) return null
 
-        try {
-            float[][][] input = new float[1][INPUT_SIZE][INPUT_SIZE * 3];
-            for (int y = 0; y < INPUT_SIZE; y++) {
-                for (int x = 0; x < INPUT_SIZE; x++) {
-                    int idx = (y * INPUT_SIZE + x) * 3;
-                    input[0][y][x * 3] = inputData[idx];
-                    input[0][y][x * 3 + 1] = inputData[idx + 1];
-                    input[0][y][x * 3 + 2] = inputData[idx + 2];
+        return try {
+            val input = Array(1) { Array(INPUT_SIZE) { FloatArray(INPUT_SIZE * 3) } }
+            for (y in 0 until INPUT_SIZE) {
+                for (x in 0 until INPUT_SIZE) {
+                    val idx = (y * INPUT_SIZE + x) * 3
+                    input[0][y][x * 3] = inputData[idx]
+                    input[0][y][x * 3 + 1] = inputData[idx + 1]
+                    input[0][y][x * 3 + 2] = inputData[idx + 2]
                 }
             }
 
-            float[][] output = new float[1][LIVENESS_CLASSES];
-            livenessInterpreter.run(input, output);
-            return output[0];
-        } catch (Exception e) {
-            Log.e(TAG, "Liveness inference failed: " + e.getMessage());
-            return null;
+            val output = Array(1) { FloatArray(LIVENESS_CLASSES) }
+            interpreter.run(input, output)
+            output[0]
+        } catch (e: Exception) {
+            Log.e(TAG, "Liveness inference failed: ${e.message}")
+            null
         }
     }
 
     /**
      * Compute cosine similarity between two embeddings.
      */
-    public static float cosineSimilarity(float[] a, float[] b) {
-        if (a.length != b.length) throw new IllegalArgumentException("Dimension mismatch");
-
-        float dot = 0;
-        for (int i = 0; i < a.length; i++) {
-            dot += a[i] * b[i];
-        }
-        return Math.max(-1, Math.min(1, dot));
+    fun cosineSimilarity(a: FloatArray, b: FloatArray): Float {
+        require(a.size == b.size) { "Dimension mismatch" }
+        var dot = 0f
+        for (i in a.indices) dot += a[i] * b[i]
+        return (-1f).coerceAtLeast(1f.coerceAtMost(dot))
     }
 
-    /**
-     * Release TFLite resources.
-     */
-    public void close() {
-        if (recognitionInterpreter != null) {
-            recognitionInterpreter.close();
-            recognitionInterpreter = null;
-        }
-        if (livenessInterpreter != null) {
-            livenessInterpreter.close();
-            livenessInterpreter = null;
-        }
-        isInitialized = false;
-        Log.i(TAG, "NetraEdge module closed");
+    fun close() {
+        recognitionInterpreter?.close()
+        livenessInterpreter?.close()
+        recognitionInterpreter = null
+        livenessInterpreter = null
+        initialized = false
+        Log.i(TAG, "NetraEdge module closed")
     }
 }
