@@ -11,8 +11,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@netraedge/core": "workspace:*",
-    "@netraedge/react-native": "workspace:*",
+    "@netraedge/core": "*",
+    "@netraedge/react-native": "*",
     "react": "^18.3.0",
     "react-native": "^0.76.0",
     "react-native-vision-camera": "^5.0.0",

@@ -15,7 +15,7 @@
     "react-native-vision-camera": ">=5.0.0"
   },
   "dependencies": {
-    "@netraedge/core": "workspace:*"
+    "@netraedge/core": "*"
   },
   "devDependencies": {
     "@types/react": "^18.3.0",

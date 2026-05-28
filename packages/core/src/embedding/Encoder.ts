@@ -74,16 +74,18 @@ export class TFLiteEncoder implements Encoder {
  */
 export class StubEncoder implements Encoder {
   private readonly _dimension: number;
+  private _isLoaded = true;
 
   constructor(dimension = 128) {
     this._dimension = dimension;
   }
 
   get isLoaded(): boolean {
-    return true;
+    return this._isLoaded;
   }
 
   encode(faceData: Uint8Array): Float32Array {
+    if (!this._isLoaded) throw new Error('Encoder not loaded');
     const embedding = new Float32Array(this._dimension);
     let seed = 0;
     for (let i = 0; i < Math.min(faceData.length, 100); i++) {
