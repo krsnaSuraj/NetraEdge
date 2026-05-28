@@ -10,7 +10,6 @@
  * in the native layer via TFLite.
  */
 
-import { LIVENESS_THRESHOLDS } from '../config/constants';
 import type { TextureResult } from '../types/Liveness';
 
 export interface TextureAnalyzer {

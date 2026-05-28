@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { StubEncoder } from '../embedding/Encoder';
-import { l2Normalize } from '../embedding/CosineSimilarity';
 
 describe('StubEncoder', () => {
   it('reports as loaded', () => {

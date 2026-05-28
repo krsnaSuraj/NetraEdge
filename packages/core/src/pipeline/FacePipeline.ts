@@ -12,9 +12,9 @@
 
 import { RECOGNITION_THRESHOLDS } from '../config/constants';
 import type { Encoder } from '../embedding/Encoder';
-import type { EmbeddingStore, IdentificationResult } from '../embedding/EmbeddingStore';
+import type { EmbeddingStore } from '../embedding/EmbeddingStore';
 import type { LivenessOrchestrator } from '../liveness/LivenessOrchestrator';
-import type { FaceDetection, Point3D } from '../types/Face';
+import type { Point3D } from '../types/Face';
 import type { LivenessResult } from '../types/Liveness';
 import { LivenessVerdict } from '../types/Liveness';
 import { type Result, ok, err, ErrorCode } from '../types/Result';
@@ -75,7 +75,7 @@ export class FacePipeline {
     userId: string,
     faceFrames: readonly Uint8Array[],
     meshPoints: readonly Point3D[][],
-    timestampMs: number,
+    _timestampMs: number,
   ): Promise<Result<EnrollmentResult>> {
     if (faceFrames.length === 0) {
       return err({

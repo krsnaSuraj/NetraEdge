@@ -43,7 +43,7 @@ export {
   SYNC_CONFIG,
   CAMERA_CONFIG,
 } from './config/constants';
-export { AppConfig, LivenessMode, validateConfig } from './config/AppConfig';
+export { type AppConfig, LivenessMode, validateConfig } from './config/AppConfig';
 
 // Embedding
 export { cosineSimilarity, l2Normalize } from './embedding/CosineSimilarity';

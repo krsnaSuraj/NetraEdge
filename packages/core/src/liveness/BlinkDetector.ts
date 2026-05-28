@@ -15,7 +15,6 @@
  */
 
 import { LIVENESS_THRESHOLDS } from '../config/constants';
-import type { Point2D } from '../types/Face';
 import type { BlinkResult } from '../types/Liveness';
 
 /**
@@ -90,12 +89,12 @@ export class BlinkDetector {
     points: ReadonlyArray<{ readonly x: number; readonly y: number }>,
     indices: readonly number[],
   ): number {
-    const p1 = points[indices[0]];
-    const p2 = points[indices[1]];
-    const p3 = points[indices[2]];
-    const p4 = points[indices[3]];
-    const p5 = points[indices[4]];
-    const p6 = points[indices[5]];
+    const p1 = points[indices[0]!];
+    const p2 = points[indices[1]!];
+    const p3 = points[indices[2]!];
+    const p4 = points[indices[3]!];
+    const p5 = points[indices[4]!];
+    const p6 = points[indices[5]!];
 
     if (!p1 || !p2 || !p3 || !p4 || !p5 || !p6) return 0.3;
 
