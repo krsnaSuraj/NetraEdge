@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useState } from 'react';
 import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 type Screen = 'home' | 'enroll' | 'verify';
@@ -55,8 +55,6 @@ export default function App(): React.JSX.Element {
 }
 
 function EnrollScreen({ onBack }: { onBack: () => void }): React.JSX.Element {
-  const [userId, setUserId] = useState('');
-
   return (
     <View style={styles.screen}>
       <Text style={styles.screenTitle}>Enroll New Face</Text>
