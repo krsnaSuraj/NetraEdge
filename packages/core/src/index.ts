@@ -63,7 +63,12 @@ export {
   StubTextureAnalyzer,
 } from './liveness/TextureAnalyzer';
 export { DepthEstimator } from './liveness/DepthEstimator';
+export { detectMoiré, type MoiréResult } from './liveness/MoiréDetector';
+export { analyzeColor, type ColorResult } from './liveness/ColorAnalyzer';
 export { LivenessOrchestrator } from './liveness/LivenessOrchestrator';
+
+// Quality
+export { evaluateQuality, type QualityResult } from './quality/QualityGate';
 
 // Pipeline
 export {

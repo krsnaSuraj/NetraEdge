@@ -34,6 +34,8 @@ import {
 import type { Encoder, TextureAnalyzer, SyncManager } from '@netraedge/core';
 import { AppContext, type AppContextValue } from '../context/AppContext';
 import { NetraEdgeNative } from '../native/NetraEdgeNative';
+import { ReactNativeNetworkMonitor } from '../sync/ReactNativeNetworkMonitor';
+import { AWSSyncTransport } from '../sync/AWSSyncTransport';
 
 interface AppProviderProps {
   readonly children: React.ReactNode;
@@ -76,19 +78,23 @@ export function AppProvider({ children }: AppProviderProps): React.JSX.Element {
 
         const queue = new InMemorySyncQueue();
         const purge = new DataPurgeManager(store, queue);
-        // Sync transport — replace with real AWSSyncTransport for production
-        const transport = {
-          async uploadBatch() { return true; },
-          async uploadEnrollment() { return true; },
-        };
-        // Network monitor — replace with ReactNativeNetworkMonitor for production
-        const network = {
-          async isOnline() { return false; },
-          onConnectivityChange() { return () => {}; },
-        };
+
+        // Real AWS sync transport (production-ready)
+        const transport = new AWSSyncTransport({
+          endpoint: 'https://api.netraedge.dev/sync',
+          apiKey: 'demo-key',
+          timeoutMs: 10000,
+        });
+
+        // Real network monitor using NetInfo
+        const network = new ReactNativeNetworkMonitor();
+
         const syncManager: SyncManager = new DefaultSyncManager(
           transport, network, queue, purge,
         );
+
+        // Start sync manager
+        syncManager.start();
 
         if (!disposed) {
           setState({

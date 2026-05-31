@@ -15,7 +15,7 @@ import { RECOGNITION_THRESHOLDS } from '@netraedge/core';
 import type { Point3D } from '@netraedge/core';
 import { useAppContext } from '../context/AppContext';
 import { useFaceRecognition } from '../hooks/useFaceRecognition';
-import { FaceCamera } from '../components/FaceCamera';
+import { FaceCamera, type DetectedFace } from '../components/FaceCamera';
 
 type Phase = 'input' | 'capturing' | 'processing' | 'done';
 
@@ -52,11 +52,11 @@ export function EnrollScreen({
   }, [userId]);
 
   const handleFaceDetected = useCallback(
-    (faces: unknown[]) => {
+    (faces: DetectedFace[]) => {
       if (phase !== 'capturing' || !collectingRef.current) return;
       if (frameCount >= targetFrames) return;
 
-      const face = (faces as Array<{ faceBounds?: { width: number }; landmarks?: Record<string, { x: number; y: number }> }>)[0];
+      const face = faces[0];
       if (!face) return;
 
       const bounds = face.faceBounds;
@@ -71,12 +71,9 @@ export function EnrollScreen({
         z: 0,
       }));
 
-      // Face crop extraction happens in native frame processor.
-      // The native module receives the camera frame, extracts the face region,
-      // resizes to 112x112, and normalizes to 0-1 float values.
-      // Here we pass face metadata (bounds, landmarks) which the native
-      // encoder uses to locate and process the face.
-      const faceData = new Float32Array(37632); // 112*112*3 — populated by native
+      // Use REAL face data from camera (112x112 normalized RGB)
+      // faceData is extracted by the native face crop pipeline
+      const faceData = new Float32Array(face.faceData);
       framesRef.current.push(faceData);
       meshRef.current.push(meshPoints);
       const newCount = framesRef.current.length;

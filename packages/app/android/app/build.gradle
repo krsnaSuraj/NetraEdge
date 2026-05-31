@@ -23,6 +23,10 @@ android {
         versionName "1.0.0"
     }
 
+    aaptOptions {
+        noCompress "tflite"
+    }
+
     signingConfigs {
         debug {
             storeFile file("debug.keystore")

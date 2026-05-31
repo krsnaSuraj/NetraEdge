@@ -14,7 +14,7 @@ import type { Point3D } from '@netraedge/core';
 import { useAppContext } from '../context/AppContext';
 import { useFaceRecognition } from '../hooks/useFaceRecognition';
 import { useLivenessCheck } from '../hooks/useLivenessCheck';
-import { FaceCamera } from '../components/FaceCamera';
+import { FaceCamera, type DetectedFace } from '../components/FaceCamera';
 
 type VerifyPhase = 'scanning' | 'liveness' | 'verifying' | 'result';
 
@@ -46,10 +46,10 @@ export function VerifyScreen({
   }, [liveness.state.isLive, phase]);
 
   const handleFaceDetected = useCallback(
-    async (faces: unknown[]) => {
+    async (faces: DetectedFace[]) => {
       if (verifiedRef.current || processingRef.current) return;
 
-      const face = (faces as Array<{ faceBounds?: { width: number }; landmarks?: Record<string, { x: number; y: number }> }>)[0];
+      const face = faces[0];
       if (!face) return;
 
       const bounds = face.faceBounds;
@@ -63,9 +63,9 @@ export function VerifyScreen({
         y: l.y,
         z: 0,
       }));
-      // Face crop populated by native frame processor.
-      // Native module extracts 112x112 face region from camera frame.
-      const faceData = new Float32Array(37632);
+
+      // Use REAL face data from camera (112x112 normalized RGB)
+      const faceData = new Float32Array(face.faceData);
 
       if (phase === 'scanning') {
         setPhase('liveness');

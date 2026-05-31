@@ -31,6 +31,34 @@ export interface NetraEdgeNativeModule {
   /** Compute cosine similarity between two embeddings */
   cosineSimilarity(a: number[], b: number[]): Promise<number>;
 
+  /**
+   * Crop face from raw frame data, resize to 112x112, normalize to 0-1.
+   * CRITICAL: Bridges camera frames to face recognition pipeline.
+   *
+   * @param imageData Raw RGB pixel data (flat float array, R,G,B,R,G,B,...)
+   * @param frameWidth Width of camera frame
+   * @param frameHeight Height of camera frame
+   * @param faceX Face bounding box X coordinate
+   * @param faceY Face bounding box Y coordinate
+   * @param faceWidth Face bounding box width
+   * @param faceHeight Face bounding box height
+   * @returns Normalized float array (37632 values) or null on failure
+   */
+  cropFace(
+    imageData: number[],
+    frameWidth: number,
+    frameHeight: number,
+    faceX: number,
+    faceY: number,
+    faceWidth: number,
+    faceHeight: number,
+  ): Promise<number[] | null>;
+
+  /**
+   * Convert YUV_420_888 byte data to normalized RGB float array.
+   */
+  yuvToNormalized(yuvData: number[], width: number, height: number): Promise<number[] | null>;
+
   /** Release TFLite resources */
   close(): void;
 }
