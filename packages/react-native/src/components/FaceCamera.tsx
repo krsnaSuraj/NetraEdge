@@ -1,14 +1,8 @@
 /**
- * FaceCamera — camera component with real-time face detection.
+ * FaceCamera — full-screen camera with real-time face detection.
  *
- * Integrates react-native-vision-camera with ML Kit face detection
- * via frame processor plugin.
- *
- * @example
- * <FaceCamera
- *   onFaceDetected={handleFace}
- *   isActive={true}
- * />
+ * Renders a full-bleed camera preview with ML Kit face detection.
+ * Children are rendered as overlays on top of the camera.
  */
 
 import React, { useCallback, useRef } from 'react';
@@ -23,13 +17,13 @@ import { detectFaces } from 'react-native-vision-camera-face-detector';
 export interface FaceCameraProps {
   readonly onFaceDetected: (faces: unknown[]) => void;
   readonly isActive: boolean;
-  readonly style?: object;
+  readonly children?: React.ReactNode;
 }
 
 export function FaceCamera({
   onFaceDetected,
   isActive,
-  style,
+  children,
 }: FaceCameraProps): React.JSX.Element {
   const device = useCameraDevice('front');
   const frameCountRef = useRef(0);
@@ -54,16 +48,17 @@ export function FaceCamera({
 
   if (!device) {
     return (
-      <View style={[styles.container, style]}>
-        <View style={styles.placeholder}>
-          {/* Camera not available */}
+      <View style={styles.container}>
+        <View style={styles.noCamera}>
+          <View style={styles.guideCircle} />
         </View>
+        {children}
       </View>
     );
   }
 
   return (
-    <View style={[styles.container, style]}>
+    <View style={styles.container}>
       <Camera
         style={StyleSheet.absoluteFill}
         device={device}
@@ -71,6 +66,10 @@ export function FaceCamera({
         frameProcessor={frameProcessor}
         pixelFormat="yuv"
       />
+      <View style={styles.guideContainer}>
+        <View style={styles.guideCircle} />
+      </View>
+      {children}
     </View>
   );
 }
@@ -78,10 +77,26 @@ export function FaceCamera({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    overflow: 'hidden',
-  },
-  placeholder: {
-    flex: 1,
     backgroundColor: '#000',
+  },
+  noCamera: {
+    flex: 1,
+    backgroundColor: '#111',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  guideContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    pointerEvents: 'none',
+  },
+  guideCircle: {
+    width: 240,
+    height: 300,
+    borderRadius: 120,
+    borderWidth: 3,
+    borderColor: 'rgba(59, 130, 246, 0.5)',
+    backgroundColor: 'transparent',
   },
 });

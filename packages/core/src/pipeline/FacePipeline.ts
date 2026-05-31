@@ -201,6 +201,11 @@ export class FacePipeline {
     });
   }
 
+  /** Get the liveness orchestrator (for UI hooks) */
+  get liveness(): LivenessOrchestrator | null {
+    return this._liveness;
+  }
+
   /** List all enrolled user IDs */
   async listUsers(): Promise<readonly string[]> {
     return this._store.listUsers();

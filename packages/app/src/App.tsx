@@ -37,7 +37,7 @@ export default function App(): React.JSX.Element {
   return (
     <AppProvider>
       <SafeAreaProvider>
-        <StatusBar barStyle="light-content" backgroundColor="#0a0a0a" />
+        <StatusBar barStyle="light-content" backgroundColor="#050510" />
         <View style={styles.container}>
           <AppNavigator />
         </View>
@@ -49,6 +49,6 @@ export default function App(): React.JSX.Element {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: '#050510',
   },
 });

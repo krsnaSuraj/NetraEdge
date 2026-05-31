@@ -1,21 +1,23 @@
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
-apply plugin: "com.facebook.react"
-
-react {
-    // Autolinking
-    autolinkLibrariesWithApp()
-}
-
-def jscFlavor = 'org.webkit:android-jsc:+'
 
 android {
     namespace "com.netraedge"
     compileSdkVersion rootProject.ext.compileSdkVersion
+    buildToolsVersion rootProject.ext.buildToolsVersion
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    kotlinOptions {
+        jvmTarget = "1.8"
+    }
 
     defaultConfig {
         applicationId "com.netraedge"
-        minSdkVersion rootProject.ext.minSdkVersion
+        minSdkVersion 24
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0.0"
@@ -40,27 +42,22 @@ android {
             signingConfig signingConfigs.debug
         }
     }
-
-    packagingOptions {
-        pickFirst "lib/armeabi-v7a/libc++_shared.so"
-        pickFirst "lib/arm64-v8a/libc++_shared.so"
-        pickFirst "lib/x86/libc++_shared.so"
-        pickFirst "lib/x86_64/libc++_shared.so"
-    }
 }
 
 dependencies {
-    implementation("com.facebook.react:react-android")
-    implementation("com.facebook.react:hermes-android")
     implementation("androidx.appcompat:appcompat:1.6.1")
+    implementation("androidx.core:core-ktx:1.12.0")
+    implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+
+    // CameraX
+    implementation("androidx.camera:camera-core:1.3.1")
+    implementation("androidx.camera:camera-camera2:1.3.1")
+    implementation("androidx.camera:camera-lifecycle:1.3.1")
+    implementation("androidx.camera:camera-view:1.3.1")
 
     // TensorFlow Lite
-    implementation("org.tensorflow:tensorflow-lite:${rootProject.ext.tfliteVersion}")
-    implementation("org.tensorflow:tensorflow-lite-support:${rootProject.ext.tfliteVersion}")
+    implementation("org.tensorflow:tensorflow-lite:2.14.0")
 
-    // Kotlin stdlib
+    // Kotlin
     implementation("org.jetbrains.kotlin:kotlin-stdlib:${rootProject.ext.kotlinVersion}")
 }
-
-apply from: file("../../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle")
-applyNativeModulesAppBuildGradle(project)

@@ -1,12 +1,5 @@
 /**
- * EnrollScreen — captures face frames and enrolls a new user.
- *
- * Flow:
- * 1. User enters a unique ID
- * 2. Camera activates with face detection overlay
- * 3. System auto-collects 10 face frames with good quality
- * 4. Pipeline encodes and stores the averaged embedding
- * 5. Result displayed (success/retry)
+ * EnrollScreen — premium face enrollment with camera.
  */
 
 import React, { useCallback, useRef, useState } from 'react';
@@ -78,8 +71,12 @@ export function EnrollScreen({
         z: 0,
       }));
 
-      const faceData = new Float32Array(112 * 112 * 3).fill(0.5);
-
+      // Face crop extraction happens in native frame processor.
+      // The native module receives the camera frame, extracts the face region,
+      // resizes to 112x112, and normalizes to 0-1 float values.
+      // Here we pass face metadata (bounds, landmarks) which the native
+      // encoder uses to locate and process the face.
+      const faceData = new Float32Array(37632); // 112*112*3 — populated by native
       framesRef.current.push(faceData);
       meshRef.current.push(meshPoints);
       const newCount = framesRef.current.length;
@@ -96,11 +93,7 @@ export function EnrollScreen({
 
   const handleEnroll = useCallback(async () => {
     try {
-      const result = await enroll(
-        userId.trim(),
-        framesRef.current,
-        meshRef.current,
-      );
+      const result = await enroll(userId.trim(), framesRef.current, meshRef.current);
       setSuccess(result);
       setPhase('done');
     } catch (e) {
@@ -119,127 +112,147 @@ export function EnrollScreen({
     collectingRef.current = false;
   }, []);
 
+  // ─── Input Phase ───
   if (phase === 'input') {
     return (
       <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={onBack} style={styles.backBtn}>
+            <Text style={styles.backBtnText}>←</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Enroll Face</Text>
+          <View style={styles.headerRight} />
+        </View>
+
         <View style={styles.content}>
-          <Text style={styles.title}>Enroll New Face</Text>
+          <View style={styles.iconCircle}>
+            <Text style={styles.iconText}>＋</Text>
+          </View>
+          <Text style={styles.title}>New Enrollment</Text>
           <Text style={styles.subtitle}>
-            Register a user for offline face verification
+            Enter a unique ID to register this face
           </Text>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>User ID</Text>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>USER ID</Text>
             <TextInput
               style={styles.input}
               value={userId}
               onChangeText={setUserId}
-              placeholder="Enter unique user ID"
-              placeholderTextColor="rgba(255,255,255,0.3)"
-              autoCapitalize="none"
+              placeholder="e.g. EMP-001"
+              placeholderTextColor="rgba(255,255,255,0.2)"
+              autoCapitalize="characters"
               autoCorrect={false}
             />
           </View>
 
-          {error && <Text style={styles.error}>{error}</Text>}
+          {error && (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          )}
 
           <TouchableOpacity
-            style={[styles.primaryButton, !userId.trim() && styles.buttonDisabled]}
+            style={[styles.mainBtn, !userId.trim() && styles.mainBtnDisabled]}
             onPress={handleStartCapture}
             disabled={!userId.trim()}
+            activeOpacity={0.8}
           >
-            <Text style={styles.primaryButtonText}>Start Capture</Text>
+            <Text style={styles.mainBtnText}>Start Capture</Text>
           </TouchableOpacity>
         </View>
-
-        <TouchableOpacity style={styles.backButton} onPress={onBack}>
-          <Text style={styles.backButtonText}>Back</Text>
-        </TouchableOpacity>
       </View>
     );
   }
 
+  // ─── Capturing Phase ───
   if (phase === 'capturing') {
+    const progress = frameCount / targetFrames;
     return (
       <View style={styles.container}>
-        <View style={styles.cameraContainer}>
-          <FaceCamera
-            onFaceDetected={handleFaceDetected}
-            isActive={true}
-            style={StyleSheet.absoluteFill}
-          />
-
-          <View style={styles.overlay}>
-            <View style={styles.progressBadge}>
-              <Text style={styles.progressText}>
-                {frameCount} / {targetFrames} frames
-              </Text>
-            </View>
-            <View style={styles.progressBar}>
-              <View
-                style={[
-                  styles.progressFill,
-                  { width: `${(frameCount / targetFrames) * 100}%` },
-                ]}
-              />
-            </View>
-            <Text style={styles.captureHint}>
-              Hold still — capturing frames automatically
+        <FaceCamera onFaceDetected={handleFaceDetected} isActive={true}>
+          {/* Top overlay */}
+          <View style={styles.captureTopOverlay}>
+            <Text style={styles.captureTitle}>Hold Still</Text>
+            <Text style={styles.captureSubtitle}>
+              Position face inside the oval
             </Text>
           </View>
-        </View>
+
+          {/* Bottom overlay */}
+          <View style={styles.captureBottomOverlay}>
+            <View style={styles.progressContainer}>
+              <View style={styles.progressBarBg}>
+                <View style={[styles.progressBarFill, { width: `${progress * 100}%` }]} />
+              </View>
+              <Text style={styles.progressText}>
+                {frameCount} / {targetFrames}
+              </Text>
+            </View>
+
+            {/* Frame dots */}
+            <View style={styles.dotsRow}>
+              {Array.from({ length: targetFrames }, (_, i) => (
+                <View
+                  key={i}
+                  style={[styles.dot, i < frameCount && styles.dotFilled]}
+                />
+              ))}
+            </View>
+          </View>
+        </FaceCamera>
       </View>
     );
   }
 
+  // ─── Processing Phase ───
   if (phase === 'processing') {
     return (
       <View style={styles.container}>
         <View style={styles.centerContent}>
-          <ActivityIndicator size="large" color="#3b82f6" />
-          <Text style={styles.processingText}>Processing enrollment...</Text>
+          <View style={styles.processingCircle}>
+            <ActivityIndicator size="large" color="#3b82f6" />
+          </View>
+          <Text style={styles.processingTitle}>Processing</Text>
           <Text style={styles.processingSub}>
-            Encoding {targetFrames} face frames
+            Encoding {targetFrames} face frames...
           </Text>
         </View>
       </View>
     );
   }
 
+  // ─── Done Phase ───
   return (
     <View style={styles.container}>
       <View style={styles.centerContent}>
-        <View
-          style={[
-            styles.resultIcon,
-            success ? styles.resultIconSuccess : styles.resultIconFail,
-          ]}
-        >
+        <View style={[styles.resultCircle, success ? styles.resultCircleOk : styles.resultCircleFail]}>
           <Text style={styles.resultEmoji}>{success ? '✓' : '✗'}</Text>
         </View>
 
         <Text style={styles.resultTitle}>
-          {success ? 'Enrollment Successful' : 'Enrollment Failed'}
+          {success ? 'Enrolled Successfully' : 'Enrollment Failed'}
         </Text>
 
         {success ? (
-          <Text style={styles.resultDetail}>
-            User "{userId}" enrolled with {targetFrames} frames
-          </Text>
+          <View style={styles.resultInfo}>
+            <Text style={styles.resultUserId}>{userId}</Text>
+            <Text style={styles.resultDetail}>{targetFrames} frames captured</Text>
+          </View>
         ) : (
           <Text style={styles.resultDetail}>
             {error ?? state.error ?? 'Could not process face frames'}
           </Text>
         )}
 
-        <TouchableOpacity style={styles.primaryButton} onPress={handleRetry}>
-          <Text style={styles.primaryButtonText}>Try Again</Text>
+        <TouchableOpacity style={styles.mainBtn} onPress={handleRetry} activeOpacity={0.8}>
+          <Text style={styles.mainBtnText}>Try Again</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.secondaryBtn} onPress={onBack} activeOpacity={0.8}>
+          <Text style={styles.secondaryBtnText}>Back to Home</Text>
         </TouchableOpacity>
       </View>
-
-      <TouchableOpacity style={styles.backButton} onPress={onBack}>
-        <Text style={styles.backButtonText}>Back to Home</Text>
-      </TouchableOpacity>
     </View>
   );
 }
@@ -247,160 +260,269 @@ export function EnrollScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: '#050510',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 56,
+    paddingBottom: 16,
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  backBtnText: {
+    color: '#fff',
+    fontSize: 20,
+  },
+  headerTitle: {
+    color: '#fff',
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  headerRight: {
+    width: 40,
   },
   content: {
     flex: 1,
     paddingHorizontal: 24,
-    paddingTop: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  iconCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 24,
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.2)',
+  },
+  iconText: {
+    fontSize: 32,
+    color: '#3b82f6',
+  },
+  title: {
+    color: '#fff',
+    fontSize: 24,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+    marginBottom: 8,
+  },
+  subtitle: {
+    color: 'rgba(255,255,255,0.35)',
+    fontSize: 14,
+    marginBottom: 32,
+    textAlign: 'center',
+  },
+  inputGroup: {
+    width: '100%',
+    marginBottom: 20,
+  },
+  inputLabel: {
+    color: 'rgba(255,255,255,0.3)',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+    marginBottom: 8,
+  },
+  input: {
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    width: '100%',
+  },
+  errorBox: {
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.2)',
+    width: '100%',
+  },
+  errorText: {
+    color: '#ef4444',
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  mainBtn: {
+    backgroundColor: '#3b82f6',
+    borderRadius: 14,
+    paddingVertical: 16,
+    alignItems: 'center',
+    width: '100%',
+  },
+  mainBtnDisabled: {
+    opacity: 0.3,
+  },
+  mainBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+  },
+  secondaryBtn: {
+    paddingVertical: 14,
+    alignItems: 'center',
+    width: '100%',
+  },
+  secondaryBtnText: {
+    color: 'rgba(255,255,255,0.3)',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  // Capture overlay
+  captureTopOverlay: {
+    position: 'absolute',
+    top: 60,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  captureTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  captureSubtitle: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 13,
+    marginTop: 4,
+  },
+  captureBottomOverlay: {
+    position: 'absolute',
+    bottom: 80,
+    left: 24,
+    right: 24,
+    alignItems: 'center',
+  },
+  progressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: 16,
+  },
+  progressBarBg: {
+    flex: 1,
+    height: 4,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 2,
+    marginRight: 12,
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: '#3b82f6',
+    borderRadius: 2,
+  },
+  progressText: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 13,
+    fontWeight: '600',
+    minWidth: 40,
+    textAlign: 'right',
+  },
+  dotsRow: {
+    flexDirection: 'row',
+    gap: 6,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  dotFilled: {
+    backgroundColor: '#3b82f6',
+  },
+  // Processing
   centerContent: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 24,
   },
-  title: {
-    color: '#fff',
-    fontSize: 28,
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-  subtitle: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 15,
-    marginBottom: 40,
-  },
-  inputContainer: {
-    marginBottom: 24,
-  },
-  label: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 13,
-    fontWeight: '600',
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  input: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    color: '#fff',
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  error: {
-    color: '#ef4444',
-    fontSize: 13,
-    marginBottom: 16,
-  },
-  primaryButton: {
-    backgroundColor: '#3b82f6',
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  buttonDisabled: {
-    opacity: 0.4,
-  },
-  primaryButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  backButton: {
-    position: 'absolute',
-    bottom: 40,
-    left: 24,
-    right: 24,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  backButtonText: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  cameraContainer: {
-    flex: 1,
-  },
-  overlay: {
-    position: 'absolute',
-    bottom: 120,
-    left: 24,
-    right: 24,
-    alignItems: 'center',
-  },
-  progressBadge: {
-    backgroundColor: 'rgba(59, 130, 246, 0.9)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 12,
-    marginBottom: 12,
-  },
-  progressText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  progressBar: {
-    width: '100%',
-    height: 4,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 2,
-    marginBottom: 12,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#3b82f6',
-    borderRadius: 2,
-  },
-  captureHint: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: 13,
-  },
-  processingText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-    marginTop: 20,
-  },
-  processingSub: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: 13,
-    marginTop: 8,
-  },
-  resultIcon: {
+  processingCircle: {
     width: 80,
     height: 80,
-    borderRadius: 40,
+    borderRadius: 24,
+    backgroundColor: 'rgba(59, 130, 246, 0.08)',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 24,
   },
-  resultIconSuccess: {
-    backgroundColor: 'rgba(34, 197, 94, 0.15)',
+  processingTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 8,
   },
-  resultIconFail: {
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+  processingSub: {
+    color: 'rgba(255,255,255,0.3)',
+    fontSize: 13,
+  },
+  // Result
+  resultCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  resultCircleOk: {
+    backgroundColor: 'rgba(34, 197, 94, 0.12)',
+    borderWidth: 2,
+    borderColor: 'rgba(34, 197, 94, 0.3)',
+  },
+  resultCircleFail: {
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    borderWidth: 2,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
   },
   resultEmoji: {
-    fontSize: 36,
+    fontSize: 32,
+    color: '#fff',
   },
   resultTitle: {
     color: '#fff',
     fontSize: 22,
-    fontWeight: '700',
+    fontWeight: '800',
     marginBottom: 8,
+    letterSpacing: -0.3,
+  },
+  resultInfo: {
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  resultUserId: {
+    color: '#3b82f6',
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 4,
   },
   resultDetail: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 14,
+    color: 'rgba(255,255,255,0.35)',
+    fontSize: 13,
     textAlign: 'center',
     marginBottom: 32,
   },

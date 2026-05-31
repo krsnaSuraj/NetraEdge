@@ -2,236 +2,341 @@
 
 ## Overview
 
-NetraEdge is an offline-first facial recognition and liveness detection system designed for zero-network environments. It runs entirely on-device using lightweight TFLite models, with optional sync to AWS when connectivity is restored.
-
-## System Architecture
+NetraEdge is a layered monorepo architecture designed for offline face recognition and liveness detection. The system follows clean architecture principles with dependency injection, functional error handling, and clear separation of concerns.
 
 ```mermaid
 graph TB
-    subgraph App["React Native App"]
-        CAM["Camera Frame<br/>react-native-vision-camera v5"]
-        FP["Frame Processor<br/>ML Kit Face Detection"]
-        CORE["@netraedge/core<br/>Pure TypeScript"]
-        SYNC["SyncManager<br/>AWS Upload + Purge"]
+    subgraph "Presentation Layer"
+        APP[Demo App]
+        SCREENS[Screens]
+        COMPONENTS[Components]
+        HOOKS[Hooks]
     end
-
-    subgraph Pipeline["FacePipeline"]
-        ENC["Encoder<br/>TFLite → 128-d embedding"]
-        LIVE["LivenessOrchestrator"]
-        STORE["EmbeddingStore<br/>SQLite"]
+    
+    subgraph "Bridge Layer"
+        RN["@netraedge/react-native"]
+        NATIVE[Native Modules]
+        CONTEXT[App Context]
     end
-
-    subgraph Liveness["Liveness Checks"]
-        BLINK["BlinkDetector<br/>EAR (Eye Aspect Ratio)"]
-        TEXTURE["TextureAnalyzer<br/>CNN real vs fake"]
-        DEPTH["DepthEstimator<br/>3D face mesh variance"]
+    
+    subgraph "Core Layer"
+        CORE["@netraedge/core"]
+        PIPELINE[FacePipeline]
+        ENCODER[Encoder]
+        LIVENESS[LivenessOrchestrator]
+        STORE[EmbeddingStore]
+        SYNC[SyncManager]
     end
-
-    CAM --> FP
-    FP --> CORE
-    CORE --> Pipeline
-    LIVE --> BLINK
-    LIVE --> TEXTURE
-    LIVE --> DEPTH
-    CORE --> SYNC
-
-    style App fill:#1e293b,stroke:#334155,color:#fff
-    style Pipeline fill:#1e3a5f,stroke:#2563eb,color:#fff
-    style Liveness fill:#1a332e,stroke:#22c55e,color:#fff
+    
+    subgraph "Platform Layer"
+        ANDROID[Kotlin TFLite]
+        IOS[Swift TFLite]
+        MODELS[TFLite Models]
+    end
+    
+    APP --> SCREENS
+    SCREENS --> HOOKS
+    HOOKS --> RN
+    RN --> CORE
+    CORE --> NATIVE
+    NATIVE --> ANDROID
+    NATIVE --> IOS
+    ANDROID --> MODELS
+    IOS --> MODELS
 ```
 
-## Data Flow
-
-### Enrollment Flow
+## Data Flow — Enrollment
 
 ```mermaid
 sequenceDiagram
     participant U as User
-    participant CAM as Camera
-    participant ML as ML Kit
-    participant ENC as Encoder
-    participant DB as SQLite
-    participant AWS as AWS
-
-    U->>CAM: Tap "Enroll"
-    CAM->>ML: Stream frames
-    ML-->>CAM: Face detected + landmarks
-    CAM->>ENC: 10 face crops
-    ENC-->>DB: 128-d embeddings (averaged)
-    Note over DB: Stored locally
-    U->>AWS: Network restored
-    AWS-->>DB: Purge local data
+    participant S as EnrollScreen
+    participant C as FaceCamera
+    participant FD as Face Detection
+    participant P as FacePipeline
+    participant E as Encoder (TFLite)
+    participant ST as EmbeddingStore
+    participant SQ as SyncQueue
+    
+    U->>S: Enter User ID
+    S->>C: Start camera
+    C->>FD: Detect faces (ML Kit)
+    FD->>S: Face detected + landmarks
+    
+    loop 10 frames
+        S->>S: Capture frame
+        S->>S: Extract mesh points
+    end
+    
+    S->>P: enroll(userId, frames, meshPoints)
+    
+    loop For each frame
+        P->>E: encode(faceData)
+        E->>E: TFLite inference (112x112x3 → 128-d)
+        E->>E: L2 normalize
+        E-->>P: embedding
+    end
+    
+    P->>P: Average embeddings
+    P->>ST: Store(userId, avgEmbedding)
+    P->>SQ: Queue for sync
+    P-->>S: EnrollmentResult
+    S->>U: Success!
 ```
 
-### Verification Flow
+## Data Flow — Verification
 
 ```mermaid
 sequenceDiagram
     participant U as User
-    participant CAM as Camera
-    participant ML as ML Kit
-    participant LIV as Liveness
-    participant ENC as Encoder
-    participant DB as EmbeddingStore
-
-    U->>CAM: Tap "Verify"
-    CAM->>ML: Stream frames
-    ML-->>CAM: Face + 478 mesh points
-    CAM->>LIV: Blink + Texture + Depth
-    LIV-->>CAM: LIVE / SPOOF
-    alt LIVE
-        CAM->>ENC: Face crop
-        ENC-->>DB: 128-d probe embedding
-        DB-->>U: Match result + confidence
-    else SPOOF
-        U-->>U: Access denied
+    participant V as VerifyScreen
+    participant C as FaceCamera
+    participant FD as Face Detection
+    participant P as FacePipeline
+    participant L as LivenessOrchestrator
+    participant E as Encoder (TFLite)
+    participant ST as EmbeddingStore
+    
+    U->>V: Open camera
+    V->>C: Start camera
+    C->>FD: Detect faces
+    FD->>V: Face detected
+    
+    V->>L: processFrame(faceData, meshPoints)
+    
+    Note over L: 3 Independent Checks
+    
+    par Check 1: Blink
+        L->>L: EAR calculation
+    and Check 2: Texture
+        L->>E: LivenessCNN inference
+    and Check 3: Depth
+        L->>L: Z-variance analysis
+    end
+    
+    L-->>V: LivenessResult
+    
+    alt Liveness PASSED (2+ checks)
+        V->>P: verify(faceData, meshPoints)
+        P->>E: encode(faceData)
+        E-->>P: 128-d embedding
+        P->>ST: identify(embedding, threshold)
+        ST-->>P: Best match
+        P-->>V: VerificationResult
+        V->>U: Identity Verified
+    else Liveness FAILED
+        V->>U: SPOOF DETECTED
     end
 ```
 
-## Model Architecture
-
-### MobileFaceNet (Face Recognition)
+## Module Dependencies
 
 ```mermaid
 graph LR
-    A["Input<br/>112×112×3"] --> B["Conv 3×3<br/>64, stride 2"]
-    B --> C["13× MobileBlock<br/>Depthwise Separable + SE"]
-    C --> D["Global Avg Pool<br/>512"]
-    D --> E["FC Layer<br/>128-d"]
-    E --> F["L2 Normalize<br/>Unit vector"]
-
-    style A fill:#1e293b,stroke:#334155,color:#fff
-    style F fill:#1a332e,stroke:#22c55e,color:#fff
+    subgraph "@netraedge/core"
+        T[Types]
+        C[Config]
+        E[Embedding]
+        L[Liveness]
+        P[Pipeline]
+        S[Sync]
+    end
+    
+    T --> C
+    T --> E
+    T --> L
+    E --> P
+    L --> P
+    S --> P
+    
+    subgraph "@netraedge/react-native"
+        H[Hooks]
+        CO[Components]
+        SC[Screens]
+        ST[Storage]
+        SY[Sync]
+        CTX[Context]
+    end
+    
+    P --> H
+    H --> SC
+    CO --> SC
+    CTX --> SC
+    ST --> SY
 ```
 
-### Liveness Detection Pipeline
+## Native Module Architecture
+
+### Android (Kotlin)
 
 ```mermaid
 graph TB
-    subgraph Input["Frame Input"]
-        FACE["Face Crop 112×112"]
-        MESH["478 Mesh Points"]
+    subgraph "React Native Bridge"
+        NM[NetraEdgeModule.kt]
+        NP[NetraEdgePackage.kt]
     end
-
-    subgraph Blink["Blink Detection"]
-        EAR["Eye Aspect Ratio"]
-        HIST["EAR History"]
-        BLINK_DET{"EAR < 0.21<br/>for 100ms?"}
+    
+    subgraph "TFLite Runtime"
+        TI[Interpreter]
+        RF[Recognition Model]
+        LF[Liveness Model]
     end
-
-    subgraph Texture["Texture Analysis"]
-        CNN["LivenessCNN"]
-        PROB["Real / Print / Screen"]
-        TEXT_DET{"Real > 0.80?"}
-    end
-
-    subgraph Depth["Depth Estimation"]
-        Z["Z-coordinates"]
-        VAR["Variance"]
-        DEP_DET{"Variance > 0.25?"}
-    end
-
-    subgraph Decision["Final Decision"]
-        PASS{"2+ checks<br/>passed?"}
-        LIVE["LIVE ✓"]
-        SPOOF["SPOOF ✗"]
-    end
-
-    FACE --> EAR
-    MESH --> EAR
-    EAR --> HIST
-    HIST --> BLINK_DET
-    FACE --> CNN
-    CNN --> PROB
-    PROB --> TEXT_DET
-    MESH --> Z
-    Z --> VAR
-    VAR --> DEP_DET
-    BLINK_DET --> PASS
-    TEXT_DET --> PASS
-    DEP_DET --> PASS
-    PASS -->|Yes| LIVE
-    PASS -->|No| SPOOF
-
-    style Input fill:#1e293b,stroke:#334155,color:#fff
-    style Blink fill:#1e3a5f,stroke:#2563eb,color:#fff
-    style Texture fill:#3b1f4e,stroke:#a855f7,color:#fff
-    style Depth fill:#1a332e,stroke:#22c55e,color:#fff
-    style Decision fill:#4a2c1a,stroke:#f59e0b,color:#fff
+    
+    NM --> NP
+    NP --> TI
+    TI --> RF
+    TI --> LF
+    
+    RF --> |"112x112x3 → 128-d"| OUT1[Embedding]
+    LF --> |"112x112x3 → 3-class"| OUT2[Probabilities]
 ```
 
-## Models
-
-| Model | Architecture | Input | Output | Size (INT8) |
-|-------|-------------|-------|--------|-------------|
-| Face Recognition | MobileFaceNet | 112×112×3 | 128-d vector | ~4.8MB |
-| Liveness Detection | Custom CNN | 112×112×3 | 3-class softmax | ~2.8MB |
-| Face Detection | ML Kit BlazeFace | Variable | Bounding box + landmarks | Built-in |
-
-**Total model size: ~7.6MB** (well under 20MB target)
-
-## Concurrency Model
+### iOS (Swift)
 
 ```mermaid
-graph LR
-    subgraph MainThread["JS Thread"]
-        UI["React UI"]
-        HOOKS["Hooks"]
+graph TB
+    subgraph "React Native Bridge"
+        SW[NetraEdgeModule.swift]
+        OC[NetraEdgeModule.m]
     end
-
-    subgraph FrameThread["Frame Processor Thread"]
-        FP["Frame Processing"]
-        DET["Face Detection"]
+    
+    subgraph "TensorFlow Lite"
+        TI[Interpreter]
+        RF[Recognition Model]
+        LF[Liveness Model]
     end
-
-    subgraph NativeThread["Native Thread Pool"]
-        TFL["TFLite Inference"]
-        DB_OPS["SQLite Operations"]
-    end
-
-    subgraph SyncThread["Background Thread"]
-        NET["Network Check"]
-        UPLOAD["AWS Upload"]
-        PURGE["Local Purge"]
-    end
-
-    UI --> HOOKS
-    HOOKS --> FP
-    FP --> DET
-    DET --> TFL
-    TFL --> DB_OPS
-    HOOKS --> NET
-    NET --> UPLOAD
-    UPLOAD --> PURGE
-
-    style MainThread fill:#1e293b,stroke:#334155,color:#fff
-    style FrameThread fill:#1e3a5f,stroke:#2563eb,color:#fff
-    style NativeThread fill:#1a332e,stroke:#22c55e,color:#fff
-    style SyncThread fill:#4a2c1a,stroke:#f59e0b,color:#fff
+    
+    SW --> OC
+    OC --> TI
+    TI --> RF
+    TI --> LF
 ```
 
 ## Error Handling
 
-All errors use the `Result<T, E>` pattern — no exceptions in business logic.
-Error codes are structured enums for programmatic handling.
+```mermaid
+graph TD
+    OP[Operation] --> CHECK{Success?}
+    CHECK -->|Yes| OK[Result.ok value]
+    CHECK -->|No| ERR[Result.error]
+    
+    ERR --> CODE[ErrorCode]
+    CODE --> HANDLER[Handle Error]
+    
+    subgraph "Error Codes"
+        FACE_NOT_FOUND
+        MODEL_NOT_LOADED
+        LIVENESS_FAILED
+        ENROLLMENT_FAILED
+        VERIFICATION_FAILED
+        SYNC_FAILED
+    end
+```
+
+## Sync Architecture
+
+```mermaid
+graph TB
+    subgraph "Offline"
+        ENROLL[Enrollment] --> QUEUE[Sync Queue]
+        QUEUE --> SQLITE[SQLite Storage]
+    end
+    
+    subgraph "Sync Manager"
+        NM[Network Monitor] --> |Online| SM[Sync Manager]
+        SM --> BATCH[Batch Upload]
+        BATCH --> TRANSPORT[REST Transport]
+    end
+    
+    subgraph "Cloud"
+        TRANSPORT --> AWS[AWS Endpoint]
+        AWS --> CONFIRM[Confirmation]
+    end
+    
+    subgraph "Purge"
+        CONFIRM --> PURGE[Purge Manager]
+        PURGE --> DELETE[Delete Local Data]
+    end
+    
+    SQLITE --> SM
+```
+
+## Testing Strategy
 
 ```mermaid
 graph LR
-    A["Operation"] -->|Success| B["Result.ok"]
-    A -->|Failure| C["Result.error"]
-    B --> D["Use value"]
-    C --> E["Handle error"]
-    E --> F["Log + Recover"]
-
-    style B fill:#1a332e,stroke:#22c55e,color:#fff
-    style C fill:#4a1a1a,stroke:#ef4444,color:#fff
+    subgraph "Unit Tests (86)"
+        UT1[CosineSimilarity]
+        UT2[BlinkDetector]
+        UT3[DepthEstimator]
+        UT4[EmbeddingStore]
+        UT5[Encoder]
+        UT6[FacePipeline]
+        UT7[LivenessOrchestrator]
+        UT8[SyncManager]
+        UT9[SyncQueue]
+        UT10[DataPurge]
+        UT11[Result]
+        UT12[Constants]
+    end
+    
+    subgraph "Integration"
+        IT1[Pipeline E2E]
+        IT2[Sync Flow]
+    end
+    
+    subgraph "Manual"
+        MT1[Camera Test]
+        MT2[Device Test]
+    end
 ```
 
-## Security
+## Performance Characteristics
 
-- All data stored locally on device
-- No network calls without explicit user action
-- Embeddings are L2-normalized (unit vectors)
-- No raw images stored — only embeddings
-- Sync uses TLS encryption
-- Purge is immediate after successful upload
+```mermaid
+graph LR
+    subgraph "Model Size"
+        REC[Recognition: 10.6 MB]
+        LIV[Liveness: 0.5 MB]
+        TOTAL[Total: 11.1 MB]
+    end
+    
+    subgraph "Inference Time"
+        T1[Encode: ~100ms]
+        T2[Liveness: ~50ms]
+        T3[Total: ~400ms]
+    end
+    
+    subgraph "Memory"
+        M1[Models: ~20 MB]
+        M2[Buffers: ~10 MB]
+        M3[Peak: ~30 MB]
+    end
+```
+
+## Security Considerations
+
+| Concern | Mitigation |
+|---------|------------|
+| Face data storage | L2-normalized embeddings only (not raw images) |
+| Local storage | SQLite with app-private directory |
+| Network sync | HTTPS with auth token |
+| Model tampering | Models bundled in APK assets |
+| Spoofing | Multi-modal liveness (blink + texture + depth) |
+
+## Future Enhancements
+
+```mermaid
+graph LR
+    NOW[Current] --> F1[Federated Learning]
+    NOW --> F2[Smile Detection]
+    NOW --> F3[Head Turn]
+    NOW --> F4[Template Encryption]
+    NOW --> F5[Model Fine-tuning]
+```
+
+---
+
+**NetraEdge** — Secure. Offline. Lightweight.
+
+NHAI Hackathon 7.0 | Datalake 3.0 Integration

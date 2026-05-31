@@ -76,10 +76,12 @@ export function AppProvider({ children }: AppProviderProps): React.JSX.Element {
 
         const queue = new InMemorySyncQueue();
         const purge = new DataPurgeManager(store, queue);
+        // Sync transport — replace with real AWSSyncTransport for production
         const transport = {
           async uploadBatch() { return true; },
           async uploadEnrollment() { return true; },
         };
+        // Network monitor — replace with ReactNativeNetworkMonitor for production
         const network = {
           async isOnline() { return false; },
           onConnectivityChange() { return () => {}; },
@@ -113,9 +115,11 @@ export function AppProvider({ children }: AppProviderProps): React.JSX.Element {
   if (state.phase === 'loading') {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#3b82f6" />
-        <Text style={styles.loadingText}>Initializing NetraEdge...</Text>
-        <Text style={styles.loadingSub}>Loading TFLite models</Text>
+        <View style={styles.loadingCircle}>
+          <ActivityIndicator size="large" color="#3b82f6" />
+        </View>
+        <Text style={styles.loadingText}>NetraEdge</Text>
+        <Text style={styles.loadingSub}>Initializing TFLite models...</Text>
       </View>
     );
   }
@@ -123,6 +127,9 @@ export function AppProvider({ children }: AppProviderProps): React.JSX.Element {
   if (state.phase === 'error') {
     return (
       <View style={styles.center}>
+        <View style={styles.errorCircle}>
+          <Text style={styles.errorEmoji}>!</Text>
+        </View>
         <Text style={styles.errorTitle}>Initialization Error</Text>
         <Text style={styles.errorText}>{state.message}</Text>
       </View>
@@ -148,41 +155,66 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#0a0a0a',
+    backgroundColor: '#050510',
     paddingHorizontal: 32,
+  },
+  loadingCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 24,
+    backgroundColor: 'rgba(59, 130, 246, 0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
   },
   loadingText: {
     color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-    marginTop: 20,
+    fontSize: 24,
+    fontWeight: '800',
+    letterSpacing: -0.5,
   },
   loadingSub: {
-    color: 'rgba(255,255,255,0.4)',
+    color: 'rgba(255,255,255,0.3)',
     fontSize: 13,
     marginTop: 8,
   },
-  errorTitle: {
+  errorCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.2)',
+  },
+  errorEmoji: {
+    fontSize: 28,
     color: '#ef4444',
+    fontWeight: '800',
+  },
+  errorTitle: {
+    color: '#fff',
     fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 12,
+    fontWeight: '800',
+    marginBottom: 8,
   },
   errorText: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 14,
+    color: 'rgba(255,255,255,0.35)',
+    fontSize: 13,
     textAlign: 'center',
     lineHeight: 20,
   },
   demoBanner: {
-    backgroundColor: 'rgba(234, 179, 8, 0.9)',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    backgroundColor: 'rgba(245, 158, 11, 0.9)',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     alignItems: 'center',
   },
   demoText: {
     color: '#000',
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '700',
   },
 });
