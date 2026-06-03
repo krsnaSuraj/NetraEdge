@@ -235,7 +235,7 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the complete architecture
 
 ### Clone & Install
 ```bash
-git clone https://github.com/<your-org>/NetraEdge.git
+git clone https://github.com/krsnaSuraj/NetraEdge.git
 cd NetraEdge
 npm install
 ```
