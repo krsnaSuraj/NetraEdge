@@ -91,8 +91,6 @@ export function FaceCamera({
           meshPoints,
         };
 
-        // @ts-expect-error - worklet context
-        const _WorkletRuntime = globalThis.WorkletRuntime;
         // Schedule async native call (non-blocking).
         // Native cropFace signature: (imageData, frameWidth, frameHeight, faceX, faceY, faceW, faceH)
         const NetraEdgeNative = NativeModules.NetraEdgeModule;
