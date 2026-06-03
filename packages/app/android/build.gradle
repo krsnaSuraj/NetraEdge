@@ -15,7 +15,7 @@ buildscript {
         maven { url("$rootDir/../../../node_modules/react-native/android") }
     }
     dependencies {
-        classpath("com.android.tools.build:gradle:8.2.2")
+        classpath("com.android.tools.build:gradle:8.9.1")
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:${kotlinVersion}")
     }
 }

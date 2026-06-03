@@ -79,9 +79,11 @@ export function AppProvider({ children }: AppProviderProps): React.JSX.Element {
         const queue = new InMemorySyncQueue();
         const purge = new DataPurgeManager(store, queue);
 
-        // Real AWS sync transport (production-ready)
+        // AWS sync — defaults to local Express mock at :4000 for hackathon
+        // demo. Replace endpoint with real AWS API Gateway URL in production
+        // (see docs/AWS_SYNC.md + infrastructure/template.yaml SAM template).
         const transport = new AWSSyncTransport({
-          endpoint: 'https://api.netraedge.dev/sync',
+          endpoint: 'http://10.0.2.2:4000/sync',
           apiKey: 'demo-key',
           timeoutMs: 10000,
         });

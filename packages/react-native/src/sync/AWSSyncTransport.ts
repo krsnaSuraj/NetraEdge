@@ -4,29 +4,43 @@
  * Uses standard fetch() for HTTP requests. Compatible with any
  * REST API backend (API Gateway + Lambda, EC2, etc.).
  *
- * For the hackathon demo, the endpoint can be a mock server
- * or a simple Lambda function that writes to DynamoDB/S3.
+ * SECURITY: applies Differential Privacy (Laplace noise) to embeddings
+ * before upload, so the cloud copy cannot be reverse-engineered to
+ * reconstruct the original face. See DPNoise.ts.
  */
 
+import { DPNoise, type DPConfig } from '@netraedge/core';
 import type { SyncTransport } from '@netraedge/core';
 
 export interface AWSTransportConfig {
   readonly endpoint: string;
   readonly apiKey: string;
   readonly timeoutMs: number;
+  /** Differential privacy config. Set dpEnabled=false to disable (NOT recommended). */
+  readonly dpConfig?: Partial<DPConfig>;
+  readonly dpEnabled?: boolean;
 }
 
 const DEFAULT_CONFIG: AWSTransportConfig = {
   endpoint: '',
   apiKey: '',
   timeoutMs: 10000,
+  dpEnabled: true,
 };
 
 export class AWSSyncTransport implements SyncTransport {
   private readonly _config: AWSTransportConfig;
+  private readonly _dp: DPNoise | null;
 
   constructor(config: Partial<AWSTransportConfig> = {}) {
     this._config = { ...DEFAULT_CONFIG, ...config };
+    this._dp = this._config.dpEnabled
+      ? new DPNoise(this._config.dpConfig)
+      : null;
+  }
+
+  private protect(embedding: Float32Array): Float32Array {
+    return this._dp ? this._dp.applyNoise(embedding) : embedding;
   }
 
   async uploadEnrollment(
@@ -43,6 +57,7 @@ export class AWSSyncTransport implements SyncTransport {
     );
 
     try {
+      const noisy = this.protect(embedding);
       const response = await fetch(`${this._config.endpoint}/enrollments`, {
         method: 'POST',
         headers: {
@@ -53,8 +68,12 @@ export class AWSSyncTransport implements SyncTransport {
         },
         body: JSON.stringify({
           userId,
-          embedding: Array.from(embedding),
-          metadata,
+          embedding: Array.from(noisy),
+          metadata: {
+            ...metadata,
+            dpApplied: !!this._dp,
+            dpEpsilon: this._dp ? this._dp.getScale() : 0,
+          },
           syncedAt: Date.now(),
         }),
         signal: controller.signal,
@@ -84,12 +103,18 @@ export class AWSSyncTransport implements SyncTransport {
     );
 
     try {
-      const payload = enrollments.map((e) => ({
-        userId: e.userId,
-        embedding: Array.from(e.embedding),
-        metadata: e.metadata,
-        syncedAt: Date.now(),
-      }));
+      const payload = enrollments.map((e) => {
+        const noisy = this.protect(e.embedding);
+        return {
+          userId: e.userId,
+          embedding: Array.from(noisy),
+          metadata: {
+            ...e.metadata,
+            dpApplied: !!this._dp,
+          },
+          syncedAt: Date.now(),
+        };
+      });
 
       const response = await fetch(`${this._config.endpoint}/enrollments/batch`, {
         method: 'POST',

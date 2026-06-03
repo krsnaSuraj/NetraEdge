@@ -1,69 +1,354 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="#050510">
+    android:background="@color/brand_bg_dark"
+    tools:context=".MainActivity">
 
-    <androidx.camera.view.PreviewView
-        android:id="@+id/camera_preview"
-        android:layout_width="match_parent"
+    <!-- ========================================================== -->
+    <!--  LAYER 0 — Ambient animated background orbs                  -->
+    <!-- ========================================================== -->
+    <com.netraedge.AmbientBackgroundView
+        android:id="@+id/ambientBg"
+        android:layout_width="0dp"
         android:layout_height="0dp"
-        android:layout_weight="1" />
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
 
-    <LinearLayout
-        android:layout_width="match_parent"
+    <!-- ========================================================== -->
+    <!--  LAYER 1 — Camera preview (full screen)                    -->
+    <!-- ========================================================== -->
+    <androidx.camera.view.PreviewView
+        android:id="@+id/previewView"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:alpha="0.92"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- Vignette overlay (subtle darkening at edges, cinematic feel) -->
+    <View
+        android:id="@+id/vignette"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="@drawable/vignette_overlay"
+        app:layout_constraintTop_toTopOf="@id/previewView"
+        app:layout_constraintBottom_toBottomOf="@id/previewView"
+        app:layout_constraintStart_toStartOf="@id/previewView"
+        app:layout_constraintEnd_toEndOf="@id/previewView" />
+
+    <!-- ========================================================== -->
+    <!--  LAYER 2 — Face overlay (conic ring, brackets, particles)  -->
+    <!-- ========================================================== -->
+    <com.netraedge.FaceOverlayView
+        android:id="@+id/faceOverlay"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:clickable="false"
+        android:focusable="false"
+        app:layout_constraintTop_toTopOf="@id/previewView"
+        app:layout_constraintBottom_toTopOf="@id/infoCard"
+        app:layout_constraintStart_toStartOf="@id/previewView"
+        app:layout_constraintEnd_toEndOf="@id/previewView" />
+
+    <!-- ========================================================== -->
+    <!--  LAYER 3 — Top glass status pill                            -->
+    <!-- ========================================================== -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/statusCard"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="24dp"
-        android:background="#050510">
-
-        <TextView
-            android:id="@+id/status_text"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="NetraEdge Ready"
-            android:textColor="#FFFFFF"
-            android:textSize="22sp"
-            android:textStyle="bold"
-            android:gravity="center"
-            android:layout_marginBottom="8dp" />
-
-        <TextView
-            android:id="@+id/info_text"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Tap Enroll or Verify"
-            android:textColor="#80FFFFFF"
-            android:textSize="14sp"
-            android:gravity="center"
-            android:layout_marginBottom="16dp" />
+        android:layout_marginTop="36dp"
+        android:layout_marginStart="20dp"
+        android:layout_marginEnd="20dp"
+        app:cardBackgroundColor="@color/glass_surface"
+        app:cardCornerRadius="28dp"
+        app:cardElevation="0dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:gravity="center">
+            android:gravity="center_vertical"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            android:paddingTop="14dp"
+            android:paddingBottom="14dp">
 
-            <Button
-                android:id="@+id/btn_enroll"
-                android:layout_width="0dp"
-                android:layout_height="56dp"
-                android:layout_weight="1"
-                android:layout_marginEnd="8dp"
-                android:text="Enroll Face"
-                android:textColor="#FFFFFF"
-                android:backgroundTint="#3b82f6" />
+            <View
+                android:id="@+id/statusDot"
+                android:layout_width="10dp"
+                android:layout_height="10dp"
+                android:background="@drawable/dot_neutral"
+                android:layout_marginEnd="12dp" />
 
-            <Button
-                android:id="@+id/btn_verify"
+            <TextView
+                android:id="@+id/statusText"
                 android:layout_width="0dp"
-                android:layout_height="56dp"
+                android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:layout_marginStart="8dp"
-                android:text="Verify Identity"
-                android:textColor="#FFFFFF"
-                android:backgroundTint="#22c55e" />
+                android:gravity="center"
+                android:text="@string/status_idle"
+                android:textColor="@color/brand_text_primary"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.02" />
+
+            <TextView
+                android:id="@+id/statusBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp"
+                android:background="@drawable/badge_neutral"
+                android:text="IDLE"
+                android:textColor="@color/brand_text_secondary"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.15" />
         </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
+    <!-- ========================================================== -->
+    <!--  LAYER 3.5 — Active Challenge Prompt (below status pill)   -->
+    <!--  Premium 2026 glassmorphism card with icon + label + text  -->
+    <!--  Sits between statusCard and faceOverlay — no overlap     -->
+    <!-- ========================================================== -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/challengePromptCard"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="32dp"
+        android:layout_marginEnd="32dp"
+        android:layout_marginTop="16dp"
+        android:alpha="0"
+        android:visibility="gone"
+        app:cardBackgroundColor="@android:color/transparent"
+        app:cardCornerRadius="32dp"
+        app:cardElevation="0dp"
+        app:layout_constraintTop_toBottomOf="@id/statusCard"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <LinearLayout
+            android:id="@+id/challengePromptContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            android:paddingTop="16dp"
+            android:paddingBottom="16dp"
+            android:background="@drawable/bg_challenge_prompt">
+
+            <TextView
+                android:id="@+id/challengeIcon"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="👁"
+                android:textSize="36sp"
+                android:layout_marginEnd="16dp" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/challengeLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="ACTIVE CHALLENGE"
+                    android:textColor="@color/brand_text_secondary"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.3" />
+
+                <TextView
+                    android:id="@+id/challengePromptText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Blink twice"
+                    android:textColor="@color/brand_text_primary"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:layout_marginTop="3dp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/challengeProgress"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center" />
+
+            <TextView
+                android:id="@+id/challengeCountdown"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="25s"
+                android:textColor="@color/brand_accent_blue"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:fontFamily="monospace"
+                android:layout_marginStart="12dp"
+                android:minWidth="40dp"
+                android:gravity="end" />
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
+    <!-- ========================================================== -->
+    <!--  LAYER 4 — Bottom info card (liveness breakdown)            -->
+    <!--  CHAINED: infoCard → syncRow → buttonRow                   -->
+    <!-- ========================================================== -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/infoCard"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="20dp"
+        android:layout_marginEnd="20dp"
+        android:layout_marginBottom="12dp"
+        app:cardBackgroundColor="@color/glass_surface"
+        app:cardCornerRadius="22dp"
+        app:cardElevation="0dp"
+        app:layout_constraintBottom_toTopOf="@id/syncRow"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="14dp">
+
+            <TextView
+                android:id="@+id/infoText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="@string/info_default"
+                android:textColor="@color/brand_text_primary"
+                android:textSize="13sp"
+                android:letterSpacing="0.01" />
+
+            <!-- Liveness signal chips (8 layers as mini bars) -->
+            <LinearLayout
+                android:id="@+id/signalRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="10dp"
+                android:weightSum="8">
+
+                <View android:id="@+id/sig1" style="@style/SignalBar" android:layout_marginEnd="3dp" />
+                <View android:id="@+id/sig2" style="@style/SignalBar" android:layout_marginEnd="3dp" />
+                <View android:id="@+id/sig3" style="@style/SignalBar" android:layout_marginEnd="3dp" />
+                <View android:id="@+id/sig4" style="@style/SignalBar" android:layout_marginEnd="3dp" />
+                <View android:id="@+id/sig5" style="@style/SignalBar" android:layout_marginEnd="3dp" />
+                <View android:id="@+id/sig6" style="@style/SignalBar" android:layout_marginEnd="3dp" />
+                <View android:id="@+id/sig7" style="@style/SignalBar" android:layout_marginEnd="3dp" />
+                <View android:id="@+id/sig8" style="@style/SignalBar" />
+            </LinearLayout>
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
+    <!-- Sync + Purge row (sits between infoCard and buttonRow) -->
+    <LinearLayout
+        android:id="@+id/syncRow"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="20dp"
+        android:layout_marginEnd="20dp"
+        android:layout_marginBottom="12dp"
+        android:orientation="horizontal"
+        app:layout_constraintBottom_toTopOf="@id/buttonRow"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <Button
+            android:id="@+id/btnSync"
+            style="@style/NetraButton.Gold"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1.2"
+            android:layout_marginEnd="8dp"
+            android:text="@string/btn_sync" />
+
+        <Button
+            android:id="@+id/btnPurge"
+            style="@style/NetraButton.Outline"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="0.8"
+            android:text="@string/btn_purge" />
     </LinearLayout>
-</LinearLayout>
+
+    <!-- Action buttons row (bottom) -->
+    <LinearLayout
+        android:id="@+id/buttonRow"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="20dp"
+        android:layout_marginEnd="20dp"
+        android:layout_marginBottom="28dp"
+        android:orientation="horizontal"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <Button
+            android:id="@+id/btnEnroll"
+            style="@style/NetraButton.Primary"
+            android:layout_width="0dp"
+            android:layout_height="60dp"
+            android:layout_weight="1.15"
+            android:layout_marginEnd="8dp"
+            android:text="@string/btn_enroll" />
+
+        <Button
+            android:id="@+id/btnVerify"
+            style="@style/NetraButton.Success"
+            android:layout_width="0dp"
+            android:layout_height="60dp"
+            android:layout_weight="1.15"
+            android:layout_marginEnd="8dp"
+            android:text="@string/btn_verify" />
+
+        <Button
+            android:id="@+id/btnReset"
+            style="@style/NetraButton.Outline"
+            android:layout_width="0dp"
+            android:layout_height="60dp"
+            android:layout_weight="0.7"
+            android:text="@string/btn_reset" />
+    </LinearLayout>
+
+    <!-- Brand watermark (very bottom, decorative) -->
+    <TextView
+        android:id="@+id/brandWatermark"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:alpha="0.5"
+        android:text="NETRAEDGE"
+        android:textColor="@color/brand_text_secondary"
+        android:textSize="9sp"
+        android:letterSpacing="0.4"
+        android:textStyle="bold"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+</androidx.constraintlayout.widget.ConstraintLayout>

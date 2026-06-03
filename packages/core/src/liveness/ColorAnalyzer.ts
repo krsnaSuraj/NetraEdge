@@ -12,6 +12,7 @@
 export interface ColorResult {
   readonly realScore: number;
   readonly skinConsistency: number;
+  readonly illuminantConsistency: number;
   readonly saturationMean: number;
   readonly saturationStd: number;
   readonly gradientSmoothness: number;
@@ -147,6 +148,7 @@ export function analyzeColor(
   return {
     realScore,
     skinConsistency,
+    illuminantConsistency: divergenceScore,
     saturationMean: satMean,
     saturationStd: satStd,
     gradientSmoothness,

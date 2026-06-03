@@ -1,0 +1,25 @@
+{
+  "metadata": {
+    "model_path": "models/face_recognition.tflite",
+    "exists": true,
+    "size_mb": 11.09,
+    "platform": "Windows-10-10.0.26100-SP0",
+    "n_runs": 50,
+    "input_shape": [
+      1,
+      112,
+      112,
+      3
+    ],
+    "input_dtype": "<class 'numpy.float32'>"
+  },
+  "metrics": {
+    "mean_ms": 4.07,
+    "p50_ms": 3.94,
+    "p95_ms": 4.97,
+    "p99_ms": 5.21,
+    "min_ms": 3.7,
+    "max_ms": 5.21
+  },
+  "honesty_note": "Measured on this machine. Mobile latency will differ \u2014 re-run on device with `adb shell` + `dumpsys cpuinfo`."
+}

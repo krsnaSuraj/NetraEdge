@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Primary blue gradient button (3-stop vertical, with multi-layer shadow) -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Outer soft glow (large, low alpha) -->
+    <item android:left="-2dp" android:right="-2dp" android:top="-2dp" android:bottom="-1dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="20dp" />
+            <solid android:color="#1A3B82F6" />
+        </shape>
+    </item>
+    <!-- Mid drop shadow (medium, more alpha) -->
+    <item android:left="0dp" android:right="0dp" android:top="2dp" android:bottom="0dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="20dp" />
+            <solid android:color="#40000000" />
+        </shape>
+    </item>
+    <!-- The actual button face -->
+    <item android:bottom="3dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="20dp" />
+            <gradient
+                android:angle="270"
+                android:startColor="@color/grad_blue_top"
+                android:centerColor="@color/grad_blue_mid"
+                android:endColor="@color/grad_blue_bot" />
+        </shape>
+    </item>
+    <!-- Top highlight (1px white sheen) -->
+    <item android:bottom="55dp">
+        <shape android:shape="rectangle">
+            <corners android:topLeftRadius="20dp" android:topRightRadius="20dp" />
+            <gradient
+                android:angle="270"
+                android:startColor="#40FFFFFF"
+                android:endColor="#00FFFFFF" />
+        </shape>
+    </item>
+</layer-list>

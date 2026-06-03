@@ -3,6 +3,7 @@ import { LivenessOrchestrator } from '../liveness/LivenessOrchestrator';
 import { StubTextureAnalyzer } from '../liveness/TextureAnalyzer';
 import { BlinkDetector } from '../liveness/BlinkDetector';
 import { DepthEstimator } from '../liveness/DepthEstimator';
+import { DepthMotionEstimator } from '../liveness/DepthMotionEstimator';
 import { LivenessVerdict } from '../types/Liveness';
 import type { Point3D } from '../types/Face';
 
@@ -25,12 +26,13 @@ describe('LivenessOrchestrator', () => {
     const textureAnalyzer = new StubTextureAnalyzer();
     const blinkDetector = new BlinkDetector(30, 0.21, 80);
     const depthEstimator = new DepthEstimator(0.25);
+    const depthMotionEstimator = new DepthMotionEstimator();
 
     orchestrator = new LivenessOrchestrator(
       textureAnalyzer,
       blinkDetector,
       depthEstimator,
-      2,
+      depthMotionEstimator,
     );
   });
 

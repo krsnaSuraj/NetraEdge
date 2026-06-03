@@ -28,6 +28,24 @@ RCT_EXTERN_METHOD(cosineSimilarity:(NSArray *)a
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 
+RCT_EXTERN_METHOD(cropFace:(NSArray *)pixels
+                  width:(nonnull NSNumber *)width
+                  height:(nonnull NSNumber *)height
+                  x:(nonnull NSNumber *)x
+                  y:(nonnull NSNumber *)y
+                  w:(nonnull NSNumber *)w
+                  cropH:(nonnull NSNumber *)cropH
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+
+RCT_EXTERN_METHOD(getEmbeddingDim:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+
 RCT_EXTERN_METHOD(close)
+
+RCT_EXTERN_METHOD(setUseTTA:(BOOL)useTTA)
+
+RCT_EXTERN_METHOD(isUseTTA:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
 
 @end

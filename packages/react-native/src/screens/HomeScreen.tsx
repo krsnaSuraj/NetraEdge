@@ -1,273 +1,156 @@
 /**
- * HomeScreen — premium main menu with enroll/verify options.
+ * HomeScreen — premium main menu with enroll/verify/settings.
+ * Uses i18n (en/hi) via the t() helper and the design tokens.
  */
 
-import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, StatusBar } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { t, subscribeLocale, type LocaleCode } from '../i18n';
+import { Icon, type IconName, StatTile } from '../components';
+import { palette, radius, spacing, type as typeScale } from '../theme';
+import { Haptics } from '../components/Haptics';
 
 export interface HomeScreenProps {
-  readonly onNavigate: (screen: 'enroll' | 'verify') => void;
+  readonly onNavigate: (screen: 'enroll' | 'verify' | 'settings') => void;
+}
+
+function useTicker(): LocaleCode {
+  const [, setN] = useState(0);
+  useEffect(() => subscribeLocale(() => setN((n) => n + 1)), []);
+  return require('../i18n').getLocale();
 }
 
 export function HomeScreen({ onNavigate }: HomeScreenProps): React.JSX.Element {
+  useTicker(); // re-render on locale change
+
+  // Display the actual embedding dim of the loaded model. -1 while loading,
+  // 128 for the pre-trained MobileFaceNet on disk, 192 for the Day-2
+  // fine-tuned GhostFaceNet-W1.
+  const [embeddingDim, setEmbeddingDim] = useState<number>(-1);
+  useEffect(() => {
+    let cancelled = false;
+    const tick = () => {
+      if (cancelled) return;
+      const netraEdge = require('../native/NetraEdgeNative').NetraEdgeNative;
+      netraEdge.getEmbeddingDim()
+        .then((d: number) => { if (!cancelled) setEmbeddingDim(d); })
+        .catch(() => { if (!cancelled) setEmbeddingDim(-1); });
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, []);
+
+  const cards: ReadonlyArray<{
+    key: 'enroll' | 'verify' | 'settings';
+    titleKey: string;
+    descKey: string;
+    icon: IconName;
+    primary?: boolean;
+  }> = [
+    { key: 'enroll',  titleKey: 'home.enrollTitle',  descKey: 'home.enrollDesc',  icon: 'plus' },
+    { key: 'verify',  titleKey: 'home.verifyTitle',  descKey: 'home.verifyDesc',  icon: 'scan', primary: true },
+    { key: 'settings',titleKey: 'settings.title',    descKey: 'home.footer',      icon: 'settings' },
+  ];
+
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#050510" />
+      <StatusBar barStyle="light-content" backgroundColor={palette.bg} />
 
-      {/* Header */}
       <View style={styles.header}>
-        <View style={styles.logoContainer}>
+        <View style={styles.logoRow}>
           <View style={styles.logoIcon}>
-            <Text style={styles.logoEmoji}>◉</Text>
+            <Icon name="shield" size={22} color={palette.primaryText} />
           </View>
-          <Text style={styles.logo}>NetraEdge</Text>
+          <Text style={styles.logo}>{t('app.name')}</Text>
         </View>
-        <Text style={styles.tagline}>Secure Offline Face Recognition</Text>
+        <Text style={styles.tagline}>{t('app.tagline')}</Text>
         <View style={styles.badge}>
           <View style={styles.badgeDot} />
-          <Text style={styles.badgeText}>100% Offline</Text>
+          <Text style={styles.badgeText}>{t('home.offlineBadge')}</Text>
         </View>
       </View>
 
-      {/* Cards */}
       <View style={styles.cards}>
-        {/* Enroll Card */}
-        <TouchableOpacity
-          style={styles.card}
-          onPress={() => onNavigate('enroll')}
-          activeOpacity={0.8}
-        >
-          <View style={styles.cardIconContainer}>
-            <Text style={styles.cardIcon}>＋</Text>
-          </View>
-          <View style={styles.cardContent}>
-            <Text style={styles.cardTitle}>Enroll New Face</Text>
-            <Text style={styles.cardDesc}>Register a user with face biometrics</Text>
-          </View>
-          <Text style={styles.cardArrow}>›</Text>
-        </TouchableOpacity>
+        {cards.map((c) => (
+          <TouchableOpacity
+            key={c.key}
+            style={[styles.card, c.primary && styles.cardPrimary]}
+            onPress={() => { Haptics.tap(); onNavigate(c.key); }}
+            activeOpacity={0.85}
+          >
+            <View style={[styles.cardIcon, c.primary && styles.cardIconPrimary]}>
+              <Icon name={c.icon} size={22} color={c.primary ? palette.primaryText : palette.textTertiary} />
+            </View>
+            <View style={styles.cardContent}>
+              <Text style={[styles.cardTitle, c.primary && styles.cardTitlePrimary]}>{t(c.titleKey)}</Text>
+              <Text style={[styles.cardDesc, c.primary && styles.cardDescPrimary]}>{t(c.descKey)}</Text>
+            </View>
+            <Text style={[styles.cardArrow, c.primary && styles.cardArrowPrimary]}>›</Text>
+          </TouchableOpacity>
+        ))}
 
-        {/* Verify Card */}
-        <TouchableOpacity
-          style={[styles.card, styles.cardPrimary]}
-          onPress={() => onNavigate('verify')}
-          activeOpacity={0.8}
-        >
-          <View style={[styles.cardIconContainer, styles.cardIconPrimary]}>
-            <Text style={[styles.cardIcon, styles.cardIconTextPrimary]}>⟳</Text>
-          </View>
-          <View style={styles.cardContent}>
-            <Text style={[styles.cardTitle, styles.cardTitlePrimary]}>Verify Identity</Text>
-            <Text style={[styles.cardDesc, styles.cardDescPrimary]}>
-              Scan face with liveness check
-            </Text>
-          </View>
-          <Text style={[styles.cardArrow, styles.cardArrowPrimary]}>›</Text>
-        </TouchableOpacity>
-
-        {/* Info Cards */}
-        <View style={styles.infoRow}>
-          <View style={styles.infoCard}>
-            <Text style={styles.infoNumber}>128</Text>
-            <Text style={styles.infoLabel}>Dimensions</Text>
-          </View>
-          <View style={styles.infoCard}>
-            <Text style={styles.infoNumber}>3</Text>
-            <Text style={styles.infoLabel}>Liveness Checks</Text>
-          </View>
-          <View style={styles.infoCard}>
-            <Text style={styles.infoNumber}>&lt;1s</Text>
-            <Text style={styles.infoLabel}>Inference</Text>
-          </View>
+        <View style={styles.statsRow}>
+          <StatTile value={embeddingDim > 0 ? String(embeddingDim) : '—'} label={t('home.infoDim')} accent="blue" />
+          <StatTile value="7"   label={t('home.infoLayers')} accent="green" />
+          <StatTile value="44"  label={t('home.infoStates')} accent="amber" />
         </View>
       </View>
 
-      {/* Footer */}
       <View style={styles.footer}>
         <View style={styles.footerDivider} />
-        <Text style={styles.footerText}>All biometric data stored on-device only</Text>
-        <Text style={styles.footerVersion}>v1.0.0 • NHAI Hackathon 7.0</Text>
+        <Text style={styles.footerText}>{t('home.footer')}</Text>
+        <Text style={styles.footerVersion}>{t('app.version')}</Text>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#050510',
-  },
-  header: {
-    alignItems: 'center',
-    paddingTop: 60,
-    paddingBottom: 32,
-    paddingHorizontal: 24,
-  },
-  logoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
+  container: { flex: 1, backgroundColor: palette.bg },
+  header: { alignItems: 'center', paddingTop: 60, paddingBottom: spacing.xxl, paddingHorizontal: spacing.xl },
+  logoRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md, gap: spacing.md },
   logoIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: 'rgba(59, 130, 246, 0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.3)',
+    width: 44, height: 44, borderRadius: 14,
+    backgroundColor: palette.primarySoft,
+    justifyContent: 'center', alignItems: 'center',
+    borderWidth: 1, borderColor: palette.primaryBorder,
   },
-  logoEmoji: {
-    fontSize: 22,
-    color: '#3b82f6',
-  },
-  logo: {
-    color: '#fff',
-    fontSize: 30,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-  },
-  tagline: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: 14,
-    letterSpacing: 0.5,
-  },
+  logo: { color: palette.textPrimary, ...typeScale.display, fontSize: 30 },
+  tagline: { color: palette.textTertiary, ...typeScale.caption, letterSpacing: 0.5 },
   badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(34, 197, 94, 0.1)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    marginTop: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(34, 197, 94, 0.2)',
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: palette.successSoft,
+    paddingHorizontal: spacing.md, paddingVertical: 6,
+    borderRadius: radius.pill, marginTop: spacing.lg,
+    borderWidth: 1, borderColor: palette.successBorder,
   },
-  badgeDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#22c55e',
-    marginRight: 8,
-  },
-  badgeText: {
-    color: '#22c55e',
-    fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-  },
-  cards: {
-    flex: 1,
-    paddingHorizontal: 20,
-    gap: 14,
-    justifyContent: 'center',
-  },
+  badgeDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: palette.success, marginRight: spacing.sm },
+  badgeText: { color: palette.success, ...typeScale.micro, fontSize: 12, letterSpacing: 0.5 },
+  cards: { flex: 1, paddingHorizontal: spacing.xl, gap: spacing.md, justifyContent: 'center' },
   card: {
-    backgroundColor: '#0f0f1a',
-    borderRadius: 20,
-    padding: 22,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: palette.bgElevated, borderRadius: radius.xl, padding: spacing.xl,
+    flexDirection: 'row', alignItems: 'center',
+    borderWidth: 1, borderColor: palette.border,
   },
-  cardPrimary: {
-    backgroundColor: 'rgba(59, 130, 246, 0.08)',
-    borderColor: 'rgba(59, 130, 246, 0.2)',
-  },
-  cardIconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  cardIconPrimary: {
-    backgroundColor: 'rgba(59, 130, 246, 0.15)',
-  },
+  cardPrimary: { backgroundColor: palette.primarySoft, borderColor: palette.primaryBorder },
   cardIcon: {
-    fontSize: 22,
-    color: 'rgba(255,255,255,0.5)',
+    width: 50, height: 50, borderRadius: 16,
+    backgroundColor: palette.glass,
+    justifyContent: 'center', alignItems: 'center',
+    marginRight: spacing.lg,
   },
-  cardIconTextPrimary: {
-    color: '#3b82f6',
-  },
-  cardContent: {
-    flex: 1,
-  },
-  cardTitle: {
-    color: '#fff',
-    fontSize: 17,
-    fontWeight: '700',
-    letterSpacing: -0.3,
-  },
-  cardTitlePrimary: {
-    color: '#60a5fa',
-  },
-  cardDesc: {
-    color: 'rgba(255,255,255,0.35)',
-    fontSize: 13,
-    marginTop: 4,
-  },
-  cardDescPrimary: {
-    color: 'rgba(96, 165, 250, 0.5)',
-  },
-  cardArrow: {
-    fontSize: 24,
-    color: 'rgba(255,255,255,0.15)',
-    fontWeight: '300',
-  },
-  cardArrowPrimary: {
-    color: 'rgba(59, 130, 246, 0.3)',
-  },
-  infoRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  infoCard: {
-    flex: 1,
-    backgroundColor: '#0f0f1a',
-    borderRadius: 16,
-    padding: 16,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.04)',
-  },
-  infoNumber: {
-    color: '#3b82f6',
-    fontSize: 20,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-  },
-  infoLabel: {
-    color: 'rgba(255,255,255,0.3)',
-    fontSize: 11,
-    marginTop: 4,
-    textAlign: 'center',
-  },
-  footer: {
-    alignItems: 'center',
-    paddingBottom: 40,
-    paddingHorizontal: 24,
-  },
-  footerDivider: {
-    width: 40,
-    height: 3,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 2,
-    marginBottom: 16,
-  },
-  footerText: {
-    color: 'rgba(255,255,255,0.2)',
-    fontSize: 12,
-  },
-  footerVersion: {
-    color: 'rgba(255,255,255,0.12)',
-    fontSize: 11,
-    marginTop: 4,
-  },
+  cardIconPrimary: { backgroundColor: palette.primarySoft },
+  cardContent: { flex: 1 },
+  cardTitle: { color: palette.textPrimary, ...typeScale.heading },
+  cardTitlePrimary: { color: palette.primaryText },
+  cardDesc: { color: palette.textTertiary, fontSize: 13, marginTop: 4 },
+  cardDescPrimary: { color: 'rgba(96,165,250,0.6)' },
+  cardArrow: { fontSize: 24, color: palette.textDisabled, fontWeight: '300' },
+  cardArrowPrimary: { color: 'rgba(59,130,246,0.3)' },
+  statsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  footer: { alignItems: 'center', paddingBottom: 40, paddingHorizontal: spacing.xl },
+  footerDivider: { width: 40, height: 3, backgroundColor: palette.borderStrong, borderRadius: 2, marginBottom: spacing.lg },
+  footerText: { color: palette.textTertiary, fontSize: 12 },
+  footerVersion: { color: palette.textDisabled, fontSize: 11, marginTop: 4 },
 });

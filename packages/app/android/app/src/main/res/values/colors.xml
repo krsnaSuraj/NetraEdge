@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ====================================================== -->
+    <!-- Brand palette: deep navy + electric blue + neon green  -->
+    <!-- ====================================================== -->
+    <color name="brand_bg_dark">#050510</color>
+    <color name="brand_surface">#0F1020</color>
+    <color name="brand_surface_alt">#1A1B30</color>
+    <color name="brand_text_primary">#FFFFFF</color>
+    <color name="brand_text_secondary">#B8C0D0</color>
+    <color name="brand_accent_blue">#3B82F6</color>
+    <color name="brand_accent_blue_dim">#1E40AF</color>
+    <color name="brand_accent_green">#22C55E</color>
+    <color name="brand_accent_green_dim">#15803D</color>
+    <color name="brand_accent_red">#EF4444</color>
+    <color name="brand_accent_amber">#F59E0B</color>
+    <color name="brand_accent_gold">#EAB308</color>
+    <color name="brand_oval_guide">#66FFFFFF</color>
+    <color name="brand_face_box">#22C55E</color>
+    <color name="brand_face_box_spoof">#EF4444</color>
+
+    <!-- 2026 Glassmorphism palette -->
+    <color name="glass_surface">#14FFFFFF</color>          <!-- 8% white -->
+    <color name="glass_surface_strong">#24FFFFFF</color>   <!-- 14% white -->
+    <color name="glass_accent_blue">#802B6FE0</color>       <!-- 50% accent blue -->
+    <color name="glass_accent_green">#8022C55E</color>
+    <color name="glass_accent_red">#80EF4444</color>
+
+    <!-- Gradient stops (for primary blue button) -->
+    <color name="grad_blue_top">#5B9EFF</color>
+    <color name="grad_blue_mid">#3B82F6</color>
+    <color name="grad_blue_bot">#1E40AF</color>
+
+    <!-- Gradient stops (for success green button) -->
+    <color name="grad_green_top">#4ADE80</color>
+    <color name="grad_green_mid">#22C55E</color>
+    <color name="grad_green_bot">#15803D</color>
+
+    <!-- Gradient stops (for gold button) -->
+    <color name="grad_gold_top">#FCD34D</color>
+    <color name="grad_gold_mid">#EAB308</color>
+    <color name="grad_gold_bot">#A16207</color>
+
+    <!-- Status dot colors -->
+    <color name="dot_neutral">#9CA3AF</color>
+    <color name="dot_active">#22C55E</color>
+    <color name="dot_warning">#F59E0B</color>
+    <color name="dot_error">#EF4444</color>
+    <color name="dot_live">#3B82F6</color>
+</resources>

@@ -1,0 +1,20 @@
+{
+  "name": "netraedge-sync-mock",
+  "version": "0.1.0",
+  "description": "Local Express mock for NetraEdge face-sync endpoint. Mirrors the AWS API Gateway contract so the same RN client code works in dev and prod.",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "morgan": "^1.10.0"
+  }
+}

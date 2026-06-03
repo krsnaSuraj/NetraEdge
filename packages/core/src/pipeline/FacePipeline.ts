@@ -10,14 +10,23 @@
  *   const result = await pipeline.verify(frame);
  */
 
-import { RECOGNITION_THRESHOLDS } from '../config/constants';
+import { RECOGNITION_THRESHOLDS, MODEL_CONFIG } from '../config/constants';
 import type { Encoder } from '../embedding/Encoder';
 import type { EmbeddingStore } from '../embedding/EmbeddingStore';
 import type { LivenessOrchestrator } from '../liveness/LivenessOrchestrator';
 import type { Point3D } from '../types/Face';
-import type { LivenessResult } from '../types/Liveness';
+import type {
+  LivenessResult,
+  ActiveChallengeResult,
+  RppgResult,
+  DepthMotionResult,
+  MoirResult,
+} from '../types/Liveness';
 import { LivenessVerdict } from '../types/Liveness';
 import { type Result, ok, err, ErrorCode } from '../types/Result';
+
+/** SOTA embedding dimension — kept in sync with MODEL_CONFIG + MixFaceNet head. */
+export const SOTA_EMBEDDING_DIM = MODEL_CONFIG.recognition.embeddingDimension;
 
 export interface EnrollmentResult {
   readonly userId: string;
@@ -160,10 +169,35 @@ export class FacePipeline {
       verdict: LivenessVerdict.UNKNOWN,
       confidence: 0,
       blink: { detected: false, earValue: 0, duration: 0 },
+      active: {
+        challengeType: 'none',
+        completed: false,
+        confidence: 0,
+        durationMs: 0,
+      } as ActiveChallengeResult,
       texture: { realScore: 0, printScore: 0, screenScore: 0 },
+      rppg: {
+        pulseDetected: false,
+        heartRateBpm: 0,
+        signalQuality: 0,
+        dominantPower: 0,
+        isLive: false,
+      } as RppgResult,
       depth: { variance: 0, isThreeDimensional: false },
+      depthMotion: { parallaxScore: 0, motionDepth: 0, isConsistent: false } as DepthMotionResult,
+      moire: { moireScore: 0, periodicity: 0, detected: false } as MoirResult,
+      color: { realScore: 0, skinConsistency: 0, illuminantConsistency: 0, isReal: false },
       passedChecks: [],
       failedChecks: [],
+      layerWeights: {
+        active_challenge: 0,
+        passive_texture: 0,
+        passive_rppg: 0,
+        passive_depth: 0,
+        passive_depth_motion: 0,
+        passive_moire: 0,
+        passive_color: 0,
+      },
     };
 
     if (this._liveness && !skipLiveness) {

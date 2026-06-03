@@ -1,0 +1,19 @@
+{
+  "metadata": {
+    "model": "deterministic-hash (UN-TRAINED baseline)",
+    "data_dir": "",
+    "synthetic": true,
+    "n_identities": 5,
+    "n_images": 20,
+    "n_pairs": 190,
+    "elapsed_seconds": 0.169
+  },
+  "metrics": {
+    "best_threshold": 0.83,
+    "best_accuracy": 0.8368,
+    "tpr_at_fpr_1e-3": 0.0,
+    "tpr_at_fpr_1e-4": 0.0,
+    "tpr_at_fpr_1e-5": 0.0
+  },
+  "honesty_note": "If `synthetic` is true, numbers reflect a hash-based baseline (near random). Replace with real embeddings once MobileFaceNet is fine-tuned on IMFDB (Day 2 of hackathon plan)."
+}

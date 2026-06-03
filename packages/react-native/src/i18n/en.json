@@ -1,0 +1,93 @@
+{
+  "app": {
+    "name": "NetraEdge",
+    "tagline": "Secure Offline Face Recognition",
+    "version": "v0.1.0 • NHAI Hackathon 7.0"
+  },
+  "home": {
+    "enrollTitle": "Enroll New Face",
+    "enrollDesc": "Register a user with face biometrics",
+    "verifyTitle": "Verify Identity",
+    "verifyDesc": "Scan face with liveness check",
+    "offlineBadge": "100% Offline",
+    "footer": "All biometric data stored on-device only",
+    "infoDim": "Embedding Dim",
+    "infoLayers": "Liveness Layers",
+    "infoStates": "States / UTs"
+  },
+  "enroll": {
+    "title": "Enroll New User",
+    "step1Title": "Position your face in the circle",
+    "step2Title": "Look at the camera and blink naturally",
+    "step3Title": "Processing embeddings...",
+    "step4Title": "Enrollment complete!",
+    "nameLabel": "Full name",
+    "namePlaceholder": "e.g. Rajesh Kumar",
+    "idLabel": "Employee ID",
+    "idPlaceholder": "e.g. NHAI-EMP-2024-001",
+    "captureButton": "Start Enrollment",
+    "submitButton": "Enroll Face",
+    "resetButton": "Reset",
+    "successMessage": "Successfully enrolled",
+    "errorName": "Please enter a name",
+    "errorId": "Please enter an employee ID",
+    "errorFace": "Could not detect a face. Please try again."
+  },
+  "verify": {
+    "title": "Verify Identity",
+    "step1Title": "Position your face in the circle",
+    "step2Title": "Blink twice",
+    "step3Title": "Now smile",
+    "step4Title": "Turn your head left",
+    "step5Title": "Turn your head right",
+    "step6Title": "Verifying...",
+    "matchTitle": "Identity Verified",
+    "noMatchTitle": "No Match Found",
+    "spoofTitle": "Spoof Detected",
+    "confidence": "Confidence",
+    "livenessScore": "Liveness",
+    "retryButton": "Try Again",
+    "backButton": "Back to Home",
+    "notInDatabase": "Face not found in the local database"
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "languageEnglish": "English",
+    "languageHindi": "हिन्दी (Hindi)",
+    "sync": "Sync",
+    "syncNow": "Sync Now",
+    "syncStatus": "Status",
+    "syncIdle": "Idle",
+    "syncInProgress": "Syncing...",
+    "syncSuccess": "Up to date",
+    "syncError": "Sync error",
+    "purge": "Local Data",
+    "purgeNow": "Purge Local Cache",
+    "purgeConfirm": "This will delete all locally cached embeddings and sync records. Enrolled users will remain on the server.",
+    "about": "About",
+    "version": "Version",
+    "model": "Recognition Model",
+    "modelVersion": "MobileFaceNet v0.1 (FP32 demo)",
+    "liveness": "Liveness Model",
+    "livenessVersion": "7-layer heuristic v0.1",
+    "buildInfo": "Build"
+  },
+  "common": {
+    "back": "Back",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "ok": "OK",
+    "loading": "Loading...",
+    "error": "Error",
+    "retry": "Retry",
+    "yes": "Yes",
+    "no": "No"
+  },
+  "errors": {
+    "cameraPermission": "Camera permission is required for face recognition.",
+    "modelLoadFailed": "Could not load recognition model. Running in demo mode.",
+    "initFailed": "Initialization failed. Please restart the app.",
+    "networkOffline": "You are offline. Changes will sync when you reconnect."
+  }
+}

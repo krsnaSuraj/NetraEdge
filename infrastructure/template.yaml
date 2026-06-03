@@ -1,0 +1,123 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+  Description: NetraEdge face-sync API. Receives 128-dim face embeddings (MobileFaceNet, Apache-2.0) from on-device RN clients and stores them in DynamoDB.
+
+Parameters:
+  StageName:
+    Type: String
+    Default: prod
+    Description: API Gateway stage name
+  ApiKeyValue:
+    Type: String
+    Default: demo-key
+    NoEcho: true
+    Description: Pre-shared API key for clients. Set via SSM Parameter in real deploys.
+  TableNamePrefix:
+    Type: String
+    Default: netraedge
+
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    MemorySize: 256
+    Timeout: 15
+    Architectures:
+      - x86_64
+    Tracing: Active
+
+Resources:
+  EnrollmentsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${TableNamePrefix}-enrollments-${StageName}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: uploadedAt
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+        - AttributeName: uploadedAt
+          KeyType: RANGE
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+
+  SyncFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub 'netraedge-sync-${StageName}'
+      CodeUri: ../server
+      Handler: server.lambdaHandler
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref EnrollmentsTable
+          NETRAEDGE_API_KEY: !Ref ApiKeyValue
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref EnrollmentsTable
+      Events:
+        SyncApi:
+          Type: Api
+          Properties:
+            Path: /sync
+            Method: post
+            Auth:
+              ApiKeyRequired: true
+        HealthApi:
+          Type: Api
+          Properties:
+            Path: /health
+            Method: get
+        StatsApi:
+          Type: Api
+          Properties:
+            Path: /v1/face-sync/stats
+            Method: get
+            Auth:
+              ApiKeyRequired: true
+
+  NetraEdgeApiKey:
+    Type: AWS::ApiGateway::ApiKey
+    Properties:
+      Name: !Sub 'netraedge-client-key-${StageName}'
+      Enabled: true
+      Value: !Ref ApiKeyValue
+
+  NetraEdgeUsagePlan:
+    Type: AWS::ApiGateway::UsagePlan
+    Properties:
+      UsagePlanName: !Sub 'netraedge-usage-${StageName}'
+      ApiStages:
+        - ApiId: !Ref SyncFunction
+          Stage: !Ref SyncFunction.Stage
+      Throttle:
+        BurstLimit: 100
+        RateLimit: 50
+      Quota:
+        Limit: 1000000
+        Period: MONTH
+
+  NetraEdgeUsagePlanKey:
+    Type: AWS::ApiGateway::UsagePlanKey
+    Properties:
+      KeyId: !Ref NetraEdgeApiKey
+      KeyType: API_KEY
+      UsagePlanId: !Ref NetraEdgeUsagePlan
+
+  LambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/netraedge-sync-${StageName}'
+      RetentionInDays: 14
+
+Outputs:
+  SyncApiUrl:
+    Description: Invoke URL for the NetraEdge sync API
+    Value: !Sub 'https://${SyncFunction}.execute-api.${AWS::Region}.amazonaws.com/${StageName}/sync'
+  EnrollmentsTableName:
+    Description: DynamoDB table storing face embeddings
+    Value: !Ref EnrollmentsTable

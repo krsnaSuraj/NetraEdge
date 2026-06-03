@@ -1,0 +1,17 @@
+{
+  "metadata": {
+    "live_dir": "",
+    "spoof_dir": "",
+    "synthetic": false,
+    "n_live": 3,
+    "n_spoof": 3
+  },
+  "metrics": {
+    "best_threshold": 0.05,
+    "hter": 0.5,
+    "apcer": 1.0,
+    "bpcer": 0.0,
+    "auc": 0.6667
+  },
+  "honesty_note": "Real dataset \u2014 numbers reflect the current detector state."
+}

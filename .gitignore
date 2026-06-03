@@ -1,30 +1,104 @@
-# Dependencies
-node_modules/
-.pnp.*
+# NetraEdge .gitignore
 
+# ---------------------------------------------------------------------------
+# Dependencies
+# ---------------------------------------------------------------------------
+node_modules/
+.pnp/
+.pnp.js
+.yarn/
+
+# ---------------------------------------------------------------------------
 # Build output
+# ---------------------------------------------------------------------------
 dist/
 build/
+**/build/
+**/dist/
 *.tsbuildinfo
+.kotlin/
 
-# Android local config (machine-specific)
+# ---------------------------------------------------------------------------
+# Android (Kotlin / Gradle) — monorepo paths
+# ---------------------------------------------------------------------------
 packages/app/android/local.properties
+packages/app/android/.gradle/
+packages/app/android/app/build/
+packages/app/android/captures/
+packages/app/android/.cxx/
+*.apk
+*.aab
+*.aar
 
-# TFLite models (large binaries)
+# Android signing (keep the debug keystore for the demo build, ignore others)
+*.jks
+*.keystore
+!app/debug.keystore
+
+# ---------------------------------------------------------------------------
+# iOS
+# ---------------------------------------------------------------------------
+packages/react-native/ios/Pods/
+packages/react-native/ios/build/
+packages/react-native/ios/Package.resolved
+packages/react-native/ios/NetraEdge.xcodeproj/xcuserdata/
+packages/react-native/ios/NetraEdge.xcworkspace/xcuserdata/
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# ---------------------------------------------------------------------------
+# React Native
+# ---------------------------------------------------------------------------
+.expo/
+.expo-shared/
+*.jks
+*.p8
+*.p12
+*.mobileprovision
+
+# ---------------------------------------------------------------------------
+# TFLite / ML models (large binaries; download on demand)
+# ---------------------------------------------------------------------------
 models/*.tflite
 models/*.onnx
 models/*.pt
+models/*.task
 !models/README.md
+!models/MODEL_CARD.md
+
+# iOS model binaries (no Xcode project ships them; keep source-only)
+packages/react-native/ios/*.tflite
+packages/react-native/ios/*.task
 
 # Training artifacts
 training/checkpoints/
 training/logs/
 training/data/
 training/notebooks/
-*.pt
-*.tflite
+training/colab/
 
+# Datasets (large, download on demand)
+datasets/
+lfw/
+lfw_persons/
+*.tgz
+
+# ---------------------------------------------------------------------------
+# Logs / temp
+# ---------------------------------------------------------------------------
+*.log
+*.out.log
+*.err.log
+logs/
+tmp/
+.env
+.env.local
+.env.*.local
+
+# ---------------------------------------------------------------------------
 # Python
+# ---------------------------------------------------------------------------
 __pycache__/
 *.py[cod]
 *$py.class
@@ -32,47 +106,18 @@ __pycache__/
 venv/
 *.egg-info/
 
-# Dataset directories (large, download on demand)
-lfw/
-lfw_persons/
-lfw-funneled.tgz
-lfw.tgz
-
-# IDE
+# ---------------------------------------------------------------------------
+# IDE / OS
+# ---------------------------------------------------------------------------
 .vscode/
 .idea/
 *.swp
 *.swo
-
-# OS
 .DS_Store
 Thumbs.db
 
-# Environment
-.env
-.env.local
-.env.*.local
-
-# Logs
-*.log
-npm-debug.log*
-
-# Expo
-.expo/
-*.jks
-*.p8
-*.p12
-*.mobileprovision
-
-# Android
-android/app/build/
-android/.gradle/
-android/local.properties
-
-# iOS
-ios/Pods/
-ios/build/
-ios/*.xcworkspace/xcuserdata/
-
-# Colab temp
-*.ipynb_checkpoints/
+# Agent / scratch spaces
+.commandcode/
+.claude/
+.code-review-graph/
+.graphify-out/

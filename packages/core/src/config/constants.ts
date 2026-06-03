@@ -6,19 +6,34 @@
  */
 
 export const MODEL_CONFIG = {
-  /** Input dimensions for face recognition model (MobileFaceNet) */
+  /** Input dimensions for face recognition model (MobileFaceNet Apache-2.0) */
   recognition: {
     inputWidth: 112,
     inputHeight: 112,
-    embeddingDimension: 128,
+    /**
+     * SOTA production dim for MobileFaceNet v1 (foamliu, 99.48% LFW,
+     * Apache-2.0). The on-disk TFLite is bit-identical to foamliu's
+     * scripted release. Native bridges read the actual dim at load
+     * time, so this constant is documentation-only (real dim comes
+     * from model).
+     */
+    embeddingDimension: 128, // SOTA production: MobileFaceNet 128-d, Apache-2.0
     modelFile: 'face_recognition.tflite',
   },
-  /** Input dimensions for liveness detection model */
+  /** Input dimensions for liveness detection model (MiniFASNet-style Apache-2.0) */
   liveness: {
     inputWidth: 112,
     inputHeight: 112,
     numClasses: 3,
     modelFile: 'liveness_detector.tflite',
+  },
+  /** Face detection / landmarks (MediaPipe Face Landmarker, Apache-2.0) */
+  faceLandmarker: {
+    modelFile: 'face_landmarker.task',
+    /** Number of 3D face landmarks (MediaPipe canonical) */
+    landmarkCount: 468,
+    /** Number of blendshape scores (eyes, mouth, jaw, brow, ...) */
+    blendshapeCount: 52,
   },
 } as const;
 
@@ -48,6 +63,29 @@ export const LIVENESS_THRESHOLDS = {
   depthVariance: 0.25,
   /** Required passing liveness checks (ALL must pass) */
   requiredChecks: 2 as const,
+} as const;
+
+export const ACTIVE_LIVENESS_CONFIG = {
+  /** Blendshape score threshold for "blink detected" (MediaPipe eyeBlinkLeft/Right) */
+  blinkThreshold: 0.5,
+  /** Required number of blinks during active challenge */
+  blinkCount: 2,
+  /** Blendshape score threshold for "smile detected" (MediaPipe _smile blendshape) */
+  smileThreshold: 0.5,
+  /** Yaw threshold in degrees for "head turned left" (MediaPipe headYaw blendshape) */
+  headTurnYawThreshold: 15,
+  /** Total time budget for active liveness challenge in ms */
+  challengeTimeoutMs: 10000,
+} as const;
+
+export const RPPG_CONFIG = {
+  /** Number of frames to accumulate for rPPG pulse estimation */
+  windowFrames: 90, // ~3 sec at 30 fps
+  /** Expected human heart rate range in Hz (40-150 bpm) */
+  minBpmHz: 0.7,
+  maxBpmHz: 2.5,
+  /** Minimum spectral peak prominence to accept a pulse signal */
+  minPeakProminence: 0.05,
 } as const;
 
 export const QUALITY_CONFIG = {

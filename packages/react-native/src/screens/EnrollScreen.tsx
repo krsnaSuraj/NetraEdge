@@ -4,7 +4,6 @@
 
 import React, { useCallback, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   StyleSheet,
   Text,
   TextInput,
@@ -15,7 +14,7 @@ import { RECOGNITION_THRESHOLDS } from '@netraedge/core';
 import type { Point3D } from '@netraedge/core';
 import { useAppContext } from '../context/AppContext';
 import { useFaceRecognition } from '../hooks/useFaceRecognition';
-import { FaceCamera, type DetectedFace } from '../components/FaceCamera';
+import { FaceCamera, AnimatedFaceRing, Haptics, type DetectedFace } from '../components';
 
 type Phase = 'input' | 'capturing' | 'processing' | 'done';
 
@@ -40,9 +39,11 @@ export function EnrollScreen({
 
   const handleStartCapture = useCallback(() => {
     if (!userId.trim()) {
+      Haptics.warn();
       setError('Please enter a user ID');
       return;
     }
+    Haptics.tap();
     setError(null);
     setPhase('capturing');
     framesRef.current = [];
@@ -65,7 +66,7 @@ export function EnrollScreen({
       const landmarks = face.landmarks;
       if (!landmarks) return;
 
-      const meshPoints: Point3D[] = Object.values(landmarks).map((l) => ({
+      const meshPoints: Point3D[] = (Object.values(landmarks) as Array<{ x: number; y: number }>).map((l) => ({
         x: l.x,
         y: l.y,
         z: 0,
@@ -78,6 +79,8 @@ export function EnrollScreen({
       meshRef.current.push(meshPoints);
       const newCount = framesRef.current.length;
       setFrameCount(newCount);
+      // Light haptic every 5 frames as gentle feedback
+      if (newCount % 5 === 0) Haptics.selection();
 
       if (newCount >= targetFrames) {
         collectingRef.current = false;
@@ -176,6 +179,11 @@ export function EnrollScreen({
             </Text>
           </View>
 
+          {/* Center ring — animated breathing indicator */}
+          <View style={styles.captureCenter}>
+            <AnimatedFaceRing size={280} active={true} progress={progress} />
+          </View>
+
           {/* Bottom overlay */}
           <View style={styles.captureBottomOverlay}>
             <View style={styles.progressContainer}>
@@ -207,9 +215,7 @@ export function EnrollScreen({
     return (
       <View style={styles.container}>
         <View style={styles.centerContent}>
-          <View style={styles.processingCircle}>
-            <ActivityIndicator size="large" color="#3b82f6" />
-          </View>
+          <AnimatedFaceRing size={200} active={true} progress={0.5} color="#22c55e" />
           <Text style={styles.processingTitle}>Processing</Text>
           <Text style={styles.processingSub}>
             Encoding {targetFrames} face frames...
@@ -403,6 +409,15 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.4)',
     fontSize: 13,
     marginTop: 4,
+  },
+  captureCenter: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   captureBottomOverlay: {
     position: 'absolute',

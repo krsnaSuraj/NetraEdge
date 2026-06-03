@@ -14,7 +14,7 @@ import type { Point3D } from '@netraedge/core';
 import { useAppContext } from '../context/AppContext';
 import { useFaceRecognition } from '../hooks/useFaceRecognition';
 import { useLivenessCheck } from '../hooks/useLivenessCheck';
-import { FaceCamera, type DetectedFace } from '../components/FaceCamera';
+import { FaceCamera, AnimatedFaceRing, type DetectedFace } from '../components';
 
 type VerifyPhase = 'scanning' | 'liveness' | 'verifying' | 'result';
 
@@ -58,7 +58,7 @@ export function VerifyScreen({
       const landmarks = face.landmarks;
       if (!landmarks) return;
 
-      const meshPoints: Point3D[] = Object.values(landmarks).map((l) => ({
+      const meshPoints: Point3D[] = (Object.values(landmarks) as Array<{ x: number; y: number }>).map((l) => ({
         x: l.x,
         y: l.y,
         z: 0,
@@ -142,6 +142,7 @@ export function VerifyScreen({
         {/* Center prompt */}
         {phase === 'scanning' && (
           <View style={styles.centerPrompt}>
+            <AnimatedFaceRing size={240} active={true} progress={0} />
             <Text style={styles.centerTitle}>{config.title}</Text>
             <Text style={styles.centerSub}>{config.subtitle}</Text>
           </View>

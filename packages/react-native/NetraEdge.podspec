@@ -6,10 +6,10 @@ Pod::Spec.new do |s|
   s.name         = 'NetraEdge'
   s.version      = package['version']
   s.summary      = package['description']
-  s.homepage     = 'https://github.com/krsnaSuraj/NetraEdge'
+  s.homepage     = 'https://github.com/nhai/NetraEdge'
   s.license      = 'MIT'
-  s.author       = { 'krsnaSuraj' => 'krsnasuraj@gmail.com' }
-  s.source       = { :git => 'https://github.com/krsnaSuraj/NetraEdge.git', :tag => s.version }
+  s.author       = { 'NetraEdge Team' => 'netraedge@example.invalid' }
+  s.source       = { :git => 'https://github.com/nhai/NetraEdge.git', :tag => s.version }
 
   s.platform     = :ios, '12.0'
   s.swift_version = '5.0'

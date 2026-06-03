@@ -7,12 +7,12 @@ describe('StubEncoder', () => {
     expect(encoder.isLoaded).toBe(true);
   });
 
-  it('returns 128-d embedding by default', async () => {
+  it('returns 512-d embedding by default (Path A+: EdgeFace-XS SOTA)', async () => {
     const encoder = new StubEncoder();
     const faceData = new Float32Array(112 * 112 * 3).fill(0.5);
     const embedding = await encoder.encode(faceData);
     expect(embedding).not.toBeNull();
-    expect(embedding!.length).toBe(128);
+    expect(embedding!.length).toBe(512);
   });
 
   it('returns deterministic embeddings', async () => {
@@ -40,6 +40,17 @@ describe('StubEncoder', () => {
     expect(encoder.isLoaded).toBe(true);
     encoder.dispose();
     expect(encoder.isLoaded).toBe(false);
+  });
+
+  it('reports embeddingDim as 512 by default (Path A+ SOTA target)', () => {
+    const encoder = new StubEncoder();
+    expect(encoder.embeddingDim).toBe(512);
+  });
+
+  it('reports embeddingDim as -1 after dispose', () => {
+    const encoder = new StubEncoder(512);
+    encoder.dispose();
+    expect(encoder.embeddingDim).toBe(-1);
   });
 
   it('supports custom dimensions', async () => {

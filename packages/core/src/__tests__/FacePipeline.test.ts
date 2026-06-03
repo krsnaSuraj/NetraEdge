@@ -7,7 +7,7 @@ import { LivenessOrchestrator } from '../liveness/LivenessOrchestrator';
 
 describe('FacePipeline', () => {
   function createPipeline() {
-    const encoder = new StubEncoder(128);
+    const encoder = new StubEncoder(512);
     const store = new InMemoryEmbeddingStore();
     const textureAnalyzer = new StubTextureAnalyzer();
     const liveness = new LivenessOrchestrator(textureAnalyzer);

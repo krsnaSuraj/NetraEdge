@@ -20,9 +20,15 @@ export type { FaceDetection, BoundingBox, FaceLandmarks, Point2D, FaceMesh, Poin
 export {
   LivenessCheck,
   LivenessVerdict,
+  LivenessLayer,
   type BlinkResult,
+  type ActiveChallengeResult,
   type TextureResult,
+  type RppgResult,
   type DepthResult,
+  type DepthMotionResult,
+  type MoirResult,
+  type ColorResult,
   type LivenessResult,
 } from './types/Liveness';
 export {
@@ -55,7 +61,7 @@ export {
   InMemoryEmbeddingStore,
 } from './embedding/EmbeddingStore';
 
-// Liveness
+// Liveness (SOTA 6-layer)
 export { BlinkDetector } from './liveness/BlinkDetector';
 export {
   type TextureAnalyzer,
@@ -63,9 +69,12 @@ export {
   StubTextureAnalyzer,
 } from './liveness/TextureAnalyzer';
 export { DepthEstimator } from './liveness/DepthEstimator';
-export { detectMoiré, type MoiréResult } from './liveness/MoiréDetector';
-export { analyzeColor, type ColorResult } from './liveness/ColorAnalyzer';
-export { LivenessOrchestrator } from './liveness/LivenessOrchestrator';
+export { DepthMotionEstimator } from './liveness/DepthMotionEstimator';
+export { RppgDetector } from './liveness/RppgDetector';
+export { ActiveChallengeManager, type ChallengeType } from './liveness/ActiveChallengeManager';
+export { detectMoire } from './liveness/MoireDetector';
+export { analyzeColor } from './liveness/ColorAnalyzer';
+export { SOTALivenessOrchestrator, LivenessOrchestrator, type SOTALivenessConfig } from './liveness/LivenessOrchestrator';
 
 // Quality
 export { evaluateQuality, type QualityResult } from './quality/QualityGate';

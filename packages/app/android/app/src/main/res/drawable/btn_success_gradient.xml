@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Success green gradient button -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:left="-2dp" android:right="-2dp" android:top="-2dp" android:bottom="-1dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="20dp" />
+            <solid android:color="#1A22C55E" />
+        </shape>
+    </item>
+    <item android:left="0dp" android:right="0dp" android:top="2dp" android:bottom="0dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="20dp" />
+            <solid android:color="#40000000" />
+        </shape>
+    </item>
+    <item android:bottom="3dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="20dp" />
+            <gradient
+                android:angle="270"
+                android:startColor="@color/grad_green_top"
+                android:centerColor="@color/grad_green_mid"
+                android:endColor="@color/grad_green_bot" />
+        </shape>
+    </item>
+    <item android:bottom="55dp">
+        <shape android:shape="rectangle">
+            <corners android:topLeftRadius="20dp" android:topRightRadius="20dp" />
+            <gradient
+                android:angle="270"
+                android:startColor="#40FFFFFF"
+                android:endColor="#00FFFFFF" />
+        </shape>
+    </item>
+</layer-list>

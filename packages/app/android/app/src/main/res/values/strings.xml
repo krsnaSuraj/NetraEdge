@@ -1,3 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">NetraEdge</string>
+    <string name="status_idle">NetraEdge Ready</string>
+    <string name="status_searching">Looking for face…</string>
+    <string name="status_align">Aligning face…</string>
+    <string name="status_enroll">Enrolling: 0/10 frames</string>
+    <string name="status_enroll_done">Enrolled successfully</string>
+    <string name="status_verify">Verifying identity…</string>
+    <string name="status_match">VERIFIED</string>
+    <string name="status_no_match">NOT RECOGNIZED</string>
+    <string name="status_spoof">SPOOF DETECTED — use a real face</string>
+    <string name="status_liveness_blink">Please BLINK twice</string>
+    <string name="status_liveness_smile">Now please SMILE</string>
+    <string name="status_liveness_turn">TURN HEAD LEFT</string>
+    <string name="status_liveness_passed">Liveness check passed</string>
+    <string name="info_default">Tap Enroll or Verify to begin</string>
+    <string name="btn_enroll">Enroll Face</string>
+    <string name="btn_verify">Verify Identity</string>
+    <string name="btn_reset">Reset</string>
+    <string name="btn_sync">Sync to Cloud</string>
+    <string name="btn_purge">Purge Local</string>
+    <string name="oval_guide_desc">Face guide oval</string>
+    <string name="confidence_fmt" formatted="false">Confidence: %1$d%% | Liveness: %2$s</string>
+    <string name="liveness_real">REAL</string>
+    <string name="liveness_fake">FAKE</string>
 </resources>

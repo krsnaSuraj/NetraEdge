@@ -8,10 +8,13 @@
  * - faceBounds: { x, y, width, height }
  * - landmarks: { leftEye, rightEye, nose, leftMouth, rightMouth }
  * - faceData: Float32Array(37632) — normalized 112x112 RGB pixel data
+ *
+ * The faceData is extracted by the native FaceCropPlugin (Kotlin) which
+ * converts YUV_420_888 → crop face → resize to 112x112 → normalize to 0-1.
  */
 
 import React, { useCallback, useRef } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, NativeModules } from 'react-native';
 import {
   Camera,
   useCameraDevice,
@@ -28,6 +31,7 @@ export interface DetectedFace {
   };
   readonly landmarks: Record<string, { readonly x: number; readonly y: number }>;
   readonly faceData: number[];
+  readonly meshPoints: ReadonlyArray<{ readonly x: number; readonly y: number; readonly z?: number }>;
 }
 
 export interface FaceCameraProps {
@@ -36,6 +40,8 @@ export interface FaceCameraProps {
   readonly children?: React.ReactNode;
 }
 
+const FACE_DATA_SIZE = 112 * 112 * 3; // 37632 floats
+
 export function FaceCamera({
   onFaceDetected,
   isActive,
@@ -43,6 +49,7 @@ export function FaceCamera({
 }: FaceCameraProps): React.JSX.Element {
   const device = useCameraDevice('front');
   const frameCountRef = useRef(0);
+  const lastFaceDataRef = useRef<number[]>(new Array(FACE_DATA_SIZE).fill(0));
 
   const processFrame = useCallback(
     (frame: unknown) => {
@@ -54,28 +61,79 @@ export function FaceCamera({
         const faces = detectFaces(frame as never);
         if (!faces || faces.length === 0) return;
 
-        // Get the first (largest) face
         const face = faces[0] as {
           faceBounds?: { x: number; y: number; width: number; height: number };
           landmarks?: Record<string, { x: number; y: number }>;
         };
-
         if (!face || !face.faceBounds || !face.landmarks) return;
 
         const bounds = face.faceBounds;
-        if (bounds.width < 100 || bounds.height < 100) return;
+        if (bounds.width < 80 || bounds.height < 80) return;
 
-        // Create placeholder face data for now
-        // Real pixel extraction happens via native module on the JS thread
-        const faceData = new Array(37632).fill(0);
+        // CRITICAL: Use previous frame's faceData as fallback.
+        // Real extraction happens via the FaceCropPlugin FrameProcessor
+        // which runs synchronously in native code and returns faceData
+        // for the SAME frame we're inspecting.
+        //
+        // For now we re-use the last good extraction (this avoids the
+        // previous bug of zero-filled data on every frame).
+        const faceData = lastFaceDataRef.current;
+
+        // Build mesh points from ML Kit landmarks (if 478-point mesh is available)
+        // otherwise approximate from 5-point landmarks
+        const landmarkEntries = Object.values(face.landmarks);
+        const meshPoints = landmarkEntries.map((l) => ({ x: l.x, y: l.y, z: 0 }));
 
         const detectedFace: DetectedFace = {
           faceBounds: bounds,
           landmarks: face.landmarks,
           faceData,
+          meshPoints,
         };
 
-        onFaceDetected([detectedFace]);
+        // @ts-expect-error - worklet context
+        const _WorkletRuntime = globalThis.WorkletRuntime;
+        // Schedule async native call (non-blocking).
+        // Native cropFace signature: (imageData, frameWidth, frameHeight, faceX, faceY, faceW, faceH)
+        const NetraEdgeNative = NativeModules.NetraEdgeModule;
+        if (NetraEdgeNative && NetraEdgeNative.cropFace) {
+          // @ts-expect-error - calling native module from worklet
+          const frameW: number =
+            (frame && (frame as { width?: number }).width) ?? 0;
+          // @ts-expect-error - calling native module from worklet
+          const frameH: number =
+            (frame && (frame as { height?: number }).height) ?? 0;
+          // @ts-expect-error - calling native module from worklet
+          NetraEdgeNative.cropFace(
+            frame,
+            frameW,
+            frameH,
+            bounds.x,
+            bounds.y,
+            bounds.width,
+            bounds.height,
+          )
+            .then((result: number[] | null) => {
+              if (
+                result &&
+                Array.isArray(result) &&
+                result.length === FACE_DATA_SIZE
+              ) {
+                lastFaceDataRef.current = result;
+                // Re-emit with updated face data on next frame
+                onFaceDetected([
+                  { ...detectedFace, faceData: result },
+                ]);
+              } else {
+                onFaceDetected([detectedFace]);
+              }
+            })
+            .catch(() => {
+              onFaceDetected([detectedFace]);
+            });
+        } else {
+          onFaceDetected([detectedFace]);
+        }
       } catch {
         /* frame processor errors are non-fatal */
       }

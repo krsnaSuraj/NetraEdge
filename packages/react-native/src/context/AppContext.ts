@@ -22,3 +22,5 @@ export function useAppContext(): AppContextValue {
   }
   return ctx;
 }
+
+export const useAppContextValue = useAppContext;

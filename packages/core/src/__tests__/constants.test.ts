@@ -44,9 +44,9 @@ describe('Configuration Constants', () => {
       expect(MODEL_CONFIG.recognition.inputHeight).toBe(112);
     });
 
-    it('has correct embedding dimension', () => {
-      expect(MODEL_CONFIG.recognition.embeddingDimension).toBe(128);
-    });
+  it('has correct SOTA embedding dimension (128-d, MobileFaceNet)', () => {
+    expect(MODEL_CONFIG.recognition.embeddingDimension).toBe(128);
+  });
 
     it('has correct liveness classes', () => {
       expect(MODEL_CONFIG.liveness.numClasses).toBe(3);

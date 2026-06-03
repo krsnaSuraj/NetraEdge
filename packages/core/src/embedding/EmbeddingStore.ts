@@ -3,11 +3,14 @@
  *
  * Uses SQLite under the hood. Each enrollment stores:
  * - userId (unique identifier)
- * - embedding (128-d float vector)
+ * - embedding (N-d float vector, N is the model's actual output dim:
+ *   128 for pre-trained MobileFaceNet, 192 for Day-2 fine-tuned
+ *   GhostFaceNet-W1)
  * - enrolledAt (timestamp)
  * - frameCount (number of frames used)
  *
  * Storage is local-only. Sync to AWS happens via SyncManager.
+ * Storage is dimension-agnostic — works for any model output dim.
  */
 
 export interface Enrollment {
@@ -57,6 +60,18 @@ export class InMemoryEmbeddingStore implements EmbeddingStore {
   async enroll(userId: string, embeddings: Float32Array[]): Promise<boolean> {
     if (embeddings.length === 0) return false;
 
+    // Enforce dimension consistency across all frames — prevents enrolling
+    // mixed-dim batches and ensures downstream matching is apples-to-apples.
+    const dim = embeddings[0]?.length ?? 0;
+    for (const emb of embeddings) {
+      if (emb.length !== dim) {
+        throw new Error(
+          `Embedding dim mismatch in enroll('${userId}'): ` +
+            `expected ${dim}, got ${emb.length}`,
+        );
+      }
+    }
+
     const averaged = this.averageEmbeddings(embeddings);
 
     this._enrollments.set(userId, {
@@ -73,9 +88,16 @@ export class InMemoryEmbeddingStore implements EmbeddingStore {
     probe: Float32Array,
     threshold: number,
   ): Promise<IdentificationResult | null> {
+    // Reject probes whose dim doesn't match any enrollment's dim. Without
+    // this check, a 128-d probe against a 192-d enrollment would silently
+    // take a partial dot product over the first 128 floats and could
+    // produce a spurious match above threshold.
     let bestMatch: IdentificationResult | null = null;
 
     for (const [userId, enrollment] of this._enrollments) {
+      if (probe.length !== enrollment.embedding.length) {
+        continue;
+      }
       const similarity = this.dotProduct(probe, enrollment.embedding);
       if (similarity >= threshold) {
         if (!bestMatch || similarity > bestMatch.confidence) {
