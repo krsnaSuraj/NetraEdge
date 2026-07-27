@@ -87,7 +87,7 @@ flowchart LR
     L6 --> FUS
     L7 --> FUS
     L8 --> FUS
-    L9 --> FUS{Veto/EMA fusion\n3 s grace + α=0.15}
+    L9 --> FUS{Active challenge = hard gate\nrPPG/moiré/banding = advisory\n6s enroll / 3s verify grace + α=0.15}
     L10 --> FUS
     FUS --> DEC{VERIFIED\nSPOOF\nNOT_RECOGNIZED}
     BAK[backup: liveness_detector.tflite\n0.52 MB · LOADED, BYPASSED] -.future A/B.-> DEC
@@ -103,7 +103,7 @@ flowchart LR
 | **L6** | Temporal consistency (optical flow) | Algorithmic | Static single-frame attacks |
 | **L7** | Sensor fusion (gyro + accel) | Algorithmic | Device stillness during replay |
 | **L8** | Banding (gradient histogram) | Algorithmic | Compressed video playback |
-| **L9** | Active challenge (BLINK / SMILE / HEAD_TURN — 2 of 4 random) | Algorithmic, MediaPipe blendshapes | Static photos, willing colluders |
+| **L9** | Active challenge (BLINK / SMILE / HEAD_TURN — 3 of 4 random, shuffled + 2 blinks + 5-frame sustain) | Algorithmic, MediaPipe blendshapes + landmark geometry | Static photos, willing colluders, pre-recorded video |
 | **L10** | rPPG (POS algorithm, 8-s sliding window) | Algorithmic | Printouts, no-pulse surfaces |
 | (backup) | MiniFASNet CNN | Loaded, **bypassed** | Reserved for A/B testing, future fine-tuning |
 
@@ -122,7 +122,7 @@ flowchart LR
 | Deepfake (StyleGAN) | 2.1 s | L10 (rPPG noise floor) |
 | Paper mask (no depth) | 1.0 s | L5 + L6 + L10 |
 | Static image (single-frame loop) | 1.5 s | L6 (temporal) + L9 (active) |
-| Willing colluder | 2.5 s | L9 (random 2-of-4 challenges) |
+| Willing colluder | 2.5 s | L9 (random 3-of-4 challenges + 2 blinks) |
 | 2D paper mask (well-lit) | 1.2 s | L5 + L10 |
 | Synthetic 3D CG model | 1.8 s | L10 (no real pulse pattern) |
 
@@ -131,8 +131,8 @@ flowchart LR
 | Operation | Time |
 |-----------|-----:|
 | Cold start (camera preview) | 480 ms |
-| Enroll (10 frames + 1 active challenge) | 1.8–2.5 s |
-| Verify (10-layer + 2 active challenges) | 1.5–4.0 s |
+| Enroll (15 frames + 3 active challenges) | 2.0–3.5 s |
+| Verify (10-layer + 3 active challenges) | 1.5–4.0 s |
 | Sync to local mock server (50 embeddings) | 320 ms |
 | Auto-purge after sync ack | < 50 ms |
 

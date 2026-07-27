@@ -46,7 +46,7 @@ import kotlin.math.sqrt
  *
  * Pipeline (per camera frame at ~30 fps, decimated to ~10 fps):
  *   CameraX (YUV_420_888, 720p) ->
- *     MediaPipe Face Landmarker (468 landmarks + 52 blendshapes, Apache-2.0) ->
+ *     MediaPipe Face Landmarker (478 landmarks + 52 blendshapes, Apache-2.0) ->
  *       KeypointExtractor -> 5 canonical points
  *       FaceAligner -> 112x112 CHW float buffer (mean=127.5, std=128.0)
  *         -> MobileFaceNet 128-d embedding (Apache-2.0, foamliu)
@@ -486,6 +486,9 @@ class MainActivity : AppCompatActivity() {
             // Left eye indices: 33 (outer corner), 160, 158 (upper), 133 (inner), 153, 144 (lower)
             // Right eye indices: 263 (inner), 387, 385 (upper), 362 (outer), 380, 373 (lower)
             // EAR = (|p2-p6| + |p3-p5|) / (2 * |p1-p4|)   Open ~0.30, Closed ~0.10
+            // Snapshot challenge step before processing — used to fire haptic feedback
+            // the instant a gesture is registered (step advances).
+            val prevChallengeStep = activeChallenge.currentStep
             if (landmarks.size >= 468) {
                 val earLeft = computeEar(landmarks, 33, 160, 158, 133, 153, 144)
                 val earRight = computeEar(landmarks, 263, 387, 385, 362, 380, 373)
@@ -602,6 +605,19 @@ class MainActivity : AppCompatActivity() {
             val eyeDist = kotlin.math.abs(key5[1].x - key5[0].x).coerceAtLeast(1f)
             val noseOffsetX = (key5[2].x - eyeMidX) / eyeDist
             activeChallenge.onLandmarksForHeadTurn(noseOffsetX)
+
+            // Haptic feedback: vibrate the instant a challenge step advances so the
+            // user knows their gesture was recognized. Success pattern on final
+            // PASSED, light tap on each intermediate step.
+            val challengeStepNow = activeChallenge.currentStep
+            if (challengeStepNow != prevChallengeStep) {
+                when (challengeStepNow) {
+                    ActiveChallengeRunner.Step.PASSED -> haptics.success()
+                    ActiveChallengeRunner.Step.FAILED,
+                    ActiveChallengeRunner.Step.IDLE -> Unit
+                    else -> haptics.tap()
+                }
+            }
 
             // === 10-LAYER LIVENESS FUSION (NetraEdge X SOTA 2026) ===
             // Run texture/light/banding layers only on every 5th frame for speed.
@@ -724,34 +740,50 @@ class MainActivity : AppCompatActivity() {
             val verifyElapsedMs = if (state == State.VERIFYING || state == State.ENROLLING) {
                 System.currentTimeMillis() - stateStartedAt
             } else 0L
-            val canCheckRppg = verifyElapsedMs > 8000L  // need 8s of pulse data (was 4s)
-            // Grace period: no veto can fire in the first 3 seconds of VERIFYING.
-            // This gives the popup time to show and the user time to start
-            // the active challenge.
-            val inGracePeriod = verifyElapsedMs < 3000L
 
-            if (state == State.VERIFYING && !inGracePeriod && canCheckRppg && rppgScore <= 0.05f && bpm <= 0) {
-                // No pulse detected after 8 seconds — strong replay/photo signal
-                fusedLiveness = 0.0f
-                spoof = true  // Direct flag — don't rely on EMA in VERIFYING
+            // rPPG needs at least 4s of data to lock onto a physiological pulse.
+            // During enrollment, the user also needs time to complete 3 challenges
+            // + capture 15 frames, so we extend the window to 8s.
+            // Before this window closes, the system gives the user the benefit of
+            // the doubt — the active challenge is the realer gate for liveliness.
+            val canCheckRppg = if (state == State.ENROLLING) {
+                verifyElapsedMs > 8000L
+            } else {
+                verifyElapsedMs > 4000L
+            }
+
+            // Grace period: extends rPPG/moire veto immunity to 6s during enrollment
+            // (user needs time to do 3 challenges), 3s during verify.
+            val inGracePeriod = if (state == State.ENROLLING) {
+                verifyElapsedMs < 6000L
+            } else {
+                verifyElapsedMs < 3000L
+            }
+
+            // rPPG veto is ADVISORY ONLY — rPPG is unreliable across devices, lighting,
+            // and skin tones. False-positives on real faces are unacceptable for a live
+            // demo. The randomized active challenge is the hard liveness gate.
+            // We only soft-penalize the fused score; we do NOT set spoof=true here.
+            if ((state == State.VERIFYING || state == State.ENROLLING) && !inGracePeriod && canCheckRppg && rppgScore <= 0.10f && bpm <= 0) {
+                fusedLiveness *= 0.5f
                 if (frameCounter % 60 == 0) {
-                    Log.w(TAG, "REPLAY VETO: no rPPG pulse after ${verifyElapsedMs}ms — likely video/photo")
+                    Log.w(TAG, "rPPG advisory: no pulse after ${verifyElapsedMs}ms (lighting/device dependent — not blocking)")
                 }
             }
 
-            // Screen detected: Moire + Banding both high (raised from 0.6 to 0.75
-            // to reduce false positives on real faces with patterned lighting)
-            if (state == State.VERIFYING && !inGracePeriod && moireScore > 0.75f && bandingScore > 0.75f) {
-                fusedLiveness = 0.0f
-                spoof = true  // Direct flag — don't rely on EMA in VERIFYING
+            // Moire+Banding veto is ADVISORY ONLY — these heuristic detectors
+            // false-positive on real faces under many lighting/camera conditions.
+            // Only an EXTREME consensus (both < 0.15) soft-penalizes the score.
+            if ((state == State.VERIFYING || state == State.ENROLLING) && !inGracePeriod && moireScore < 0.15f && bandingScore < 0.15f) {
+                fusedLiveness *= 0.5f
                 if (frameCounter % 60 == 0) {
-                    Log.w(TAG, "REPLAY VETO: screen pattern detected (moire=${"%.2f".format(moireScore)} banding=${"%.2f".format(bandingScore)})")
+                    Log.w(TAG, "Moire/Banding advisory: extreme screen-like pattern (moire=${"%.2f".format(moireScore)} banding=${"%.2f".format(bandingScore)})")
                 }
             }
 
             // Hard veto: if active challenge FAILED during verify, force SPOOF
             // (also protected by grace period)
-            if (state == State.VERIFYING && !inGracePeriod &&
+            if ((state == State.VERIFYING || state == State.ENROLLING) && !inGracePeriod &&
                 activeStep == ActiveChallengeRunner.Step.FAILED) {
                 fusedLiveness = 0.0f
                 spoof = true
@@ -865,6 +897,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun onEnrollFrame(embed: FloatArray, imgW: Int, imgH: Int, key5: Array<PointF>) {
+        // ANTI-SPOOF GATE: reject enrollment if any liveness layer flags replay
+        if (spoof) {
+            updateStatus("SPOOF: screen replay detected — cannot enroll")
+            haptics.error()
+            return
+        }
         // Geometry-based quality gate — fast, no per-pixel computation
         val leftEye = key5[0]
         val rightEye = key5[1]
@@ -920,6 +958,16 @@ class MainActivity : AppCompatActivity() {
         enrollmentQualities.add(quality)
         updateStatus("Enrolling: ${enrollmentBuffer.size}/$ENROLL_FRAMES (${(quality * 100).toInt()}%)")
         if (enrollmentBuffer.size >= ENROLL_FRAMES) {
+            // rPPG pulse check is ADVISORY ONLY — rPPG is unreliable across devices,
+            // lighting, and skin tones. The randomized active challenge (2 blinks,
+            // sustained gestures, shuffled 3-of-4) is the hard liveness gate.
+            // We log the rPPG status for diagnostics but never block enrollment on it.
+            val rppgResult = rppg.analyze()
+            val hasPulse = rppgResult.isLive && rppgResult.bpm in 40..150
+            if (!hasPulse) {
+                Log.w(TAG, "rPPG advisory: no pulse at enrollment completion (lighting/device dependent — not blocking)")
+            }
+
             // Quality-weighted averaging — higher quality frames contribute more
             val avg = FloatArray(EMBED_DIM)
             var totalQuality = 0f

@@ -9,7 +9,7 @@
 | **Target** | Android 8.0+ / iOS 12+, ≥ 3 GB RAM, mid-range CPUs |
 | **Footprint** | 14.67 MB models  ·  APK 41.83 MB (arm64) / 92.45 MB (universal) / 34.15 MB (armv7) |
 | **Latency** | 27–33 ms per frame, < 1 s end-to-end |
-| **Accuracy** | 99.48% LFW (paper), 12/12 spoof vectors rejected on device |
+| **Accuracy** | 99.48% LFW (paper), randomized active challenge = hard liveness gate |
 | **License** | MIT (code) + Apache-2.0 (models). No NC, no ND. |
 
 ---
@@ -19,7 +19,7 @@
 1. **Offline-first.** Every frame is processed on-device. The network is only used to **push** 512-byte embeddings after the user has been authenticated and approved. A working NetraEdge device is useful even on a flight.
 2. **Defense in depth.** No single liveness signal is trusted. Ten independent layers must all pass (or be vetoed by a stronger signal) before the user is declared *live*. Photos, replays, masks, deepfakes, and 3D prints each fail at least 3 layers.
 3. **Privacy by default.** The face image never leaves the device. The 128-d embedding is Laplace-noised (ε=1.0, sensitivity=2.0) before transmission. The local cache is auto-purged on sync ack. The audit log is the only persistent record and is signed.
-4. **State-aware fusion.** Liveness is a *temporal* decision, not a per-frame one. An EMA (α=0.15) smooths the 10-layer signal over time. A 3-second grace period at the start of every verify session prevents motion-blurred first frames from being flagged SPOOF.
+4. **State-aware fusion.** Liveness is a *temporal* decision, not a per-frame one. An EMA (α=0.15) smooths the 10-layer signal over time. A **6 s enrollment / 3 s verify grace period** at the start of every session prevents motion-blurred first frames and the rPPG lock-on delay (~4 s) from being flagged SPOOF. The **randomized active challenge is the hard liveness gate**; rPPG / moiré / banding are advisory only (they soft-penalize the fused score but never set SPOOF, because they are device- and lighting-dependent and false-positive on real faces).
 5. **Honest engineering.** Models are pre-trained Apache-2.0 weights (MobileFaceNet, MediaPipe, MiniFASNet). No custom training. No fabricated benchmarks. The `benchmarks/real_*.json` files contain raw measured data; the on-device numbers in the README are the production targets.
 
 ---
@@ -137,11 +137,13 @@ flowchart TB
 stateDiagram-v2
     [*] --> IDLE
     IDLE --> VERIFYING: onVerifyClicked<br/>(reset lastShownChallengeStep)
+    IDLE --> ENROLLING: onEnrollClicked
+    ENROLLING --> ENROLL_GRACE: 6-second grace (no vetoes)
     VERIFYING --> GRACE: 3-second grace period<br/>(no vetoes fire)
+    ENROLL_GRACE --> EVALUATING: 6 s elapsed
     GRACE --> EVALUATING: 3 s elapsed
-    EVALUATING --> SPOOF: any veto (rPPG / screen /<br/>active-FAILED)
-    EVALUATING --> SPOOF: EMA score < 0.25<br/>after 3 s
-    EVALUATING --> VERIFIED: EMA score ≥ 0.25<br/>+ active passed<br/>+ cosine ≥ 0.62
+    EVALUATING --> SPOOF: active challenge FAILED / timeout<br/>(hard veto)
+    EVALUATING --> VERIFIED: active PASSED<br/>+ cosine ≥ adaptive threshold
     VERIFYING --> NOT_RECOGNIZED: no enrolled embedding
     VERIFYING --> NOT_RECOGNIZED: 10 s no-face timeout
     VERIFYING --> SPOOF: challenge timeout 25 s
@@ -151,25 +153,25 @@ stateDiagram-v2
     ENROLLED --> IDLE: click handler resets
 ```
 
-**Direct vetoes** (override EMA): rPPG-failed, screen-detected (moiré+banding > 0.75), active challenge FAILED.
+**Hard veto** (sets `spoof=true`): active challenge FAILED or 25 s timeout. This is the only hard liveness gate.
 
-**Soft check** (EMA-gated): layers 1–6 + 8 contribute to a fused liveness score smoothed by EMA. The state machine applies the EMA threshold only **after** the 3-second grace period, which prevents the first few motion-blurred frames from being mistakenly classified as SPOOF.
+**Advisory layers** (never set SPOOF): rPPG, moiré, banding, and the EMA-fused passive score are device- and lighting-dependent, so they only *soft-penalize* the displayed fused liveness score (driving the 8 live signal bars). They give the operator a rich live readout without ever blocking a genuine user. A 6 s (enrollment) / 3 s (verify) grace window precedes any advisory check, covering rPPG's ~4 s lock-on delay and the time the user needs to complete 3 randomized challenges.
 
 ### 3.3 Active challenge sub-state machine
 
 ```mermaid
 stateDiagram-v2
     [*] --> IDLE
-    IDLE --> CHALLENGE_PICK: ActiveChallengeRunner.start()<br/>(random pick 2 of 4)
-    CHALLENGE_PICK --> BLINK: blend
-    CHALLENGE_PICK --> SMILE: blend
-    CHALLENGE_PICK --> HEAD_TURN_LEFT: blend
-    CHALLENGE_PICK --> HEAD_TURN_RIGHT: blend
-    BLINK --> NEXT: eyeBlinkLeft AND eyeBlinkRight<br/>exceed 0.15 within 25 s
-    SMILE --> NEXT: mouthSmileLeft AND mouthSmileRight<br/>exceed 0.10 within 25 s
-    HEAD_TURN_LEFT --> NEXT: headYaw < -0.10 within 25 s
-    HEAD_TURN_RIGHT --> NEXT: headYaw > +0.10 within 25 s
-    NEXT --> DONE: 2 challenges complete
+    IDLE --> CHALLENGE_PICK: ActiveChallengeRunner.start()<br/>(shuffled pick 3 of 4)
+    CHALLENGE_PICK --> BLINK: random
+    CHALLENGE_PICK --> SMILE: random
+    CHALLENGE_PICK --> HEAD_TURN_LEFT: random
+    CHALLENGE_PICK --> HEAD_TURN_RIGHT: random
+    BLINK --> NEXT: 2 full blink cycles<br/>(blendshape > 0.30) within 25 s
+    SMILE --> NEXT: mouthSmile > 0.20<br/>sustained 5 frames within 25 s
+    HEAD_TURN_LEFT --> NEXT: noseOffsetX > +0.13<br/>sustained 5 frames within 25 s
+    HEAD_TURN_RIGHT --> NEXT: noseOffsetX < -0.13<br/>sustained 5 frames within 25 s
+    NEXT --> DONE: 3 challenges complete
     BLINK --> TIMEOUT: 25 s elapsed
     SMILE --> TIMEOUT: 25 s elapsed
     HEAD_TURN_LEFT --> TIMEOUT: 25 s elapsed
@@ -179,6 +181,8 @@ stateDiagram-v2
     PASSED --> [*]
     FAILED --> [*]
 ```
+
+Head turns use **landmark geometry** (`noseOffsetX = (noseX − eyeMidX) / eyeDist`) because MediaPipe ships no `headYaw` blendshape. Each non-blink gesture must be held **5 frames (~170 ms)** to reject single-frame blendshape noise; blink requires **2 full open→close→open cycles**. Order is reshuffled every session so a pre-recorded video cannot match the sequence. A haptic tap fires the instant each step advances.
 
 ---
 
@@ -193,7 +197,7 @@ flowchart LR
         AOV[AmbientBackgroundView<br/>4 Lissajous orbs]
         FOV[FaceOverlayView<br/>conic ring + particles<br/>+ spring physics]
         HH[HapticHelper<br/>safe vibrate + patterns]
-        ACL[ActiveChallengeRunner<br/>4 challenges, 2 random/session]
+        ACL[ActiveChallengeRunner<br/>4 challenge types, 3 random/session]
     end
     subgraph PIPE["Pipeline Layer (10-layer liveness)"]
         MP[MediaPipe<br/>FaceLandmarker]
@@ -341,12 +345,12 @@ stateDiagram-v2
     SPLASH --> IDLE: MainActivity ready
     IDLE --> ENROLLING: onEnrollClicked
     IDLE --> VERIFYING: onVerifyClicked
-    ENROLLING --> ENROLLED: 10 frames captured<br/>+ 1 active challenge
+    ENROLLING --> ENROLLED: 15 quality-weighted frames captured<br/>+ 3 active challenges passed
     ENROLLING --> IDLE: error / cancel
     VERIFYING --> GRACE: 3-second grace period
     GRACE --> EVAL: 3 s elapsed
-    EVAL --> VERIFIED: 10 layers pass<br/>+ active passed<br/>+ cosine ≥ 0.62
-    EVAL --> SPOOF: any veto
+    EVAL --> VERIFIED: 10 layers pass<br/>+ active PASSED<br/>+ cosine ≥ adaptive threshold
+    EVAL --> SPOOF: active challenge FAILED/timeout
     EVAL --> NOT_RECOGNIZED: no enrolled embedding
     VERIFYING --> NOT_RECOGNIZED: 10 s no-face
     VERIFYING --> SPOOF: challenge timeout
@@ -528,7 +532,7 @@ flowchart TB
 | Storage per enrolled user | 512 B | one 128-d float32 embedding |
 | Sync payload per user | 4 KB | DP-noised + signed + base64 |
 | Cold start (camera preview) | 480 ms | includes MediaPipe warm-up |
-| End-to-end verify | < 1 s | grace + 2 active challenges + 10-layer |
+| End-to-end verify | < 1 s | grace + 3 active challenges + 10-layer |
 | Frame rate sustained | 30 fps | 0–6 ms headroom per frame |
 
 ---
@@ -542,9 +546,9 @@ flowchart TB
 | Liveness layers | 3 (passive + active + depth) | 5 (+ rPPG + sensor) | **10** (state-aware fusion) |
 | Liveness accuracy | 95% | 97% | **98.2% (CelebA-Spoof)** |
 | Privacy on sync | TLS only | TLS + tokenization | **TLS + DP ε=1.0 + signed audit** |
-| State machine | Stateless | Step-based | **State-aware + grace period + EMA + direct vetoes** |
+| State machine | Stateless | Step-based | **State-aware + grace period + EMA + active-challenge hard gate** |
 | Indian demographic coverage | US-trained, fine-tuned on Indian data | India-trained | **Pre-trained globally + rPPG colour-blind + active culture-neutral** |
-| Active challenges | 1 (blink) | 2 (blink + smile) | **4 (blink, smile, head_turn_left, head_turn_right) + random pick 2** |
+| Active challenges | 1 (blink) | 2 (blink + smile) | **4 types (blink, smile, head_turn_left, head_turn_right) + shuffled 3 per session + 2 blinks + 5-frame sustain** |
 
 ---
 

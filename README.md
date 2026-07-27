@@ -45,10 +45,10 @@ NetraEdge is a cross-platform React Native application that provides:
 | 6 | **Temporal Consistency** (optical flow) | Static images, single-frame attacks |
 | 7 | **Banding Detector** (gradient histogram) | Compressed video playback |
 | 8 | **Sensor Fusion** (gyro + accelerometer) | Device stillness during replay |
-| 9 | **Active Challenge** (BLINK / SMILE / HEAD_TURN — 2 random of 4) | Static photos, willing colluders |
-| 10 | **rPPG Pulse** (POS algorithm, 8-s window) | Printout, plaster, no-pulse surfaces |
+| 9 | **Active Challenge** (BLINK / SMILE / HEAD_TURN — 3 of 4 random, shuffled) | Static photos, willing colluders, pre-recorded video |
+| 10 | **rPPG Pulse** (POS algorithm, 8-s window) | Advisory layer — feeds signal bars; device/lighting-dependent |
 
-All 10 layers are **algorithmic** and run **fully on-device**, zero network. Spoof decision uses state-aware fusion with EMA smoothing (α=0.15) and a 3-second grace period at the start of each verify session to prevent false positives. The `liveness_detector.tflite` (MiniFASNet, 0.52 MB) is loaded into the APK but **bypassed** at the spoof decision — it is kept as a backup / future-toggle for A/B testing on Indian demographics. Effective runtime footprint: **14.15 MB** (liveness model loaded but not invoked).
+All 10 layers are **algorithmic** and run **fully on-device**, zero network. The **randomized active challenge (L9) is the hard liveness gate** — a photo can't gesture and a pre-recorded video can't match the shuffled order. The other 9 layers feed an EMA-smoothed fused score (α=0.15) shown live in the 8 signal bars, with a **6 s enrollment / 3 s verify grace period** so a real face is never falsely blocked while rPPG locks on. rPPG / moiré / banding are **advisory only** (soft-penalize the fused score, never set SPOOF) — they are device- and lighting-dependent. The `liveness_detector.tflite` (MiniFASNet, 0.52 MB) is loaded into the APK but **bypassed** at the spoof decision — kept as a backup / future-toggle for A/B testing on Indian demographics. Effective runtime footprint: **14.15 MB** (liveness model loaded but not invoked).
 
 ```mermaid
 flowchart LR
@@ -70,7 +70,7 @@ flowchart LR
     L6 --> FUS
     L7 --> FUS
     L8 --> FUS
-    L9 --> FUS{Veto+EMA<br/>3 s grace + α=0.15}
+    L9 --> FUS{Active challenge = hard gate<br/>rPPG/moiré/banding = advisory<br/>6s enroll / 3s verify grace + α=0.15}
     L10 --> FUS
     FUS --> D{VERIFIED<br/>SPOOF<br/>NOT_RECOGNIZED}
     classDef alg fill:#1E2342,stroke:#8B5CF6,color:#F1F5F9,stroke-width:1px;
@@ -272,9 +272,9 @@ adb shell am start -n com.netraedge/.MainActivity
 ## Hackathon Demo Flow
 
 1. **Launch app** → 2026 premium UI: glassmorphism, conic gradients, particle effects
-2. **Tap "Enroll Face"** → align face in green reticle, complete 2 random active challenges (BLINK / SMILE / HEAD_TURN_LEFT / HEAD_TURN_RIGHT) → 10 layers verify liveness → 128-d embedding encrypted and stored locally
-3. **Tap "Verify Identity"** → 3-second grace period (no false SPOOF) → 10 layers evaluate liveness → 2 active challenges → embedding matched at threshold 0.62 (cosine) → **VERIFIED** badge appears with golden glow
-4. **Try spoofing** → show photo / replay video / wear mask → SPOOF badge appears in red with forensic detail
+2. **Tap "Enroll Face"** → align face in green reticle, complete 3 randomized active challenges (BLINK / SMILE / HEAD_TURN_LEFT / HEAD_TURN_RIGHT, shuffled each session) → 10 layers evaluate liveness → 15 quality-weighted frames → 128-d embedding encrypted and stored locally
+3. **Tap "Verify Identity"** → 6 s enroll / 3 s verify grace period (no false SPOOF) → 10 layers evaluate liveness → 3 randomized active challenges → embedding matched at adaptive threshold (~0.45–0.60 cosine) → **VERIFIED** badge appears with golden glow
+4. **Try spoofing** → show photo / replay video / wear mask → active challenge can't be completed → SPOOF badge appears in red with forensic detail
 5. **Tap "Sync"** → HTTPS POST to Datalake 3.0 endpoint → 200 OK → local cache auto-purged → audit log retained
 6. **Long-press "Sync"** → endpoint override dialog (for restricted networks)
 

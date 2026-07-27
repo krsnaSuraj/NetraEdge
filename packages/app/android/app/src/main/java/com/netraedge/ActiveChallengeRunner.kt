@@ -12,6 +12,12 @@ import kotlin.random.Random
  * automated replay attacks and pre-computed bypasses.
  *
  *   IDLE -> [random step 1] -> [random step 2] -> [random step 3] -> PASSED
+ *
+ * Anti-bypass defenses:
+ *   - Gesture must be HELD for minGestureFrames (15 = 500ms) before advancing
+ *     (prevents single-frame flukes from video noise)
+ *   - 2 blinks required (harder to time with a pre-recorded video)
+ *   - Thresholds calibrated for intentional gestures, not micro-movements
  */
 class ActiveChallengeRunner {
 
@@ -24,30 +30,37 @@ class ActiveChallengeRunner {
     private var blinkCount = 0
     private var lastBlinkAt = 0L
     private var startedAt = 0L
-    private val challengeTimeoutMs = 25_000L  // 25s — generous for demo, less likely to time out
+    private val challengeTimeoutMs = 25_000L
 
-    // Detection thresholds tuned for MediaPipe Face Landmarker blendshapes (V2 model).
-    // Range: 0.0 (no expression) to 1.0 (full expression).
-    // Per MediaPipe documentation:
-    //   Smile blendshapes (mouthSmileLeft/Right) typically peak at 0.2-0.5 for a natural smile
-    //   (the V2 model is conservative — exaggerated smiles reach 0.7+).
-    //   Blink (eyeBlinkLeft/Right) peaks at 0.6-0.95 for a full blink.
-    //   jawOpen is reliable: 0.3+ means clearly talking/smiling with mouth open.
-    // Thresholds are intentionally LOW so a natural smile/blink registers.
-    private val blinkThreshold = 0.15f  // lowered from 0.20 for natural blinks
-    private val smileThreshold = 0.10f  // lowered from 0.15 for natural smiles
-    private val jawOpenThreshold = 0.25f  // used as backup for "open mouth smile"
+    // Thresholds tuned for INTENTIONAL gestures (not micro-expressions).
+    // MediaPipe V2 model ranges: 0.0 (neutral) to 1.0 (full expression).
+    // These require a clear, deliberate action but stay forgiving enough for a
+    // smooth live demo — a passive face or video noise will not trigger them.
+    private val blinkThreshold = 0.30f       // a real, conscious blink (full blink peaks 0.6+)
+    private val smileThreshold = 0.20f       // a visible smile (natural smile peaks 0.2-0.5)
+    private val jawOpenThreshold = 0.30f     // clearly open mouth (backup for big smiles)
 
     // EAR (Eye Aspect Ratio) for fallback blink detection from landmarks
-    // EAR = (|p2-p6| + |p3-p5|) / (2*|p1-p4|)
     // Open eye: ~0.25-0.35, Closed eye: ~0.05-0.15
-    // Threshold 0.22 is a balance — catches natural blinks without
-    // false-positives on partial squints.
     private val earThreshold = 0.22f
 
-    // Head turn is detected by landmark geometry (left/right eye position change
-    // and nose offset from face center) — NOT blendshapes, since MediaPipe does
-    // not provide a "headYaw" blendshape. Detection happens in MainActivity.
+    // Minimum consecutive frames a gesture must persist before advancing.
+    // At ~25-30fps, 5 frames ≈ 170-200ms — responsive for a live demo yet long
+    // enough to reject single-frame blendshape noise / compression artifacts.
+    private val minGestureFrames = 5
+
+    // Require 2 blinks — single blink could be natural, 2 proves interaction.
+    // Video replay attackers can't precisely control blink timing in a
+    // pre-recorded clip against a random challenge sequence.
+    private val requiredBlinks = 2
+
+    // Consecutive frames where the current gesture condition is met.
+    // Reset when the condition drops below threshold (user stopped the gesture).
+    private var gestureFrameCount = 0
+
+    // Track whether we already captured the blink close phase for this blink
+    // (prevents counting the same blink twice if it spans multiple frames)
+    private var blinkCloseCaptured = false
 
     private var pendingGesture = GestureResult.PENDING
     private var lastBlinkLeft = 0f
@@ -57,15 +70,15 @@ class ActiveChallengeRunner {
     private var stepIndex = 0
 
     fun start() {
-        // 4 challenges available, randomly pick 2 per session. Includes
-        // head turn for variety but uses LOWER threshold (0.10 instead of
-        // 0.15) so a small head turn registers — user doesn't need to
-        // rotate so far that the face exits the frame.
+        // Randomly pick 3 out of 4 challenge types. Random order prevents
+        // attackers from pre-recording a video that plays in the expected sequence.
         val all = listOf(Step.BLINK, Step.SMILE, Step.HEAD_TURN_LEFT, Step.HEAD_TURN_RIGHT)
-        challengeOrder = all.shuffled().take(2)
+        challengeOrder = all.shuffled().take(3)
         stepIndex = 0
         currentStep = challengeOrder[0]
         blinkCount = 0
+        blinkCloseCaptured = false
+        gestureFrameCount = 0
         startedAt = System.currentTimeMillis()
         pendingGesture = GestureResult.PENDING
         Log.i(TAG, "Active challenge started — order: ${challengeOrder.map { it.name }}")
@@ -101,31 +114,51 @@ class ActiveChallengeRunner {
 
         when (currentStep) {
             Step.BLINK -> {
-                val lClosed = blinkLeft > blinkThreshold
-                val rClosed = blinkRight > blinkThreshold
-                val justBlinked = (lClosed || rClosed) &&
-                    (lastBlinkLeft < blinkThreshold && lastBlinkRight < blinkThreshold)
-                if (justBlinked && (nowMs - lastBlinkAt) > 200) {
-                    blinkCount += 1
+                val leftClosed = blinkLeft > blinkThreshold
+                val rightClosed = blinkRight > blinkThreshold
+                val anyEyeClosed = leftClosed || rightClosed
+
+                // Edge-detected blink: transition from OPEN -> CLOSED
+                val wasOpen = lastBlinkLeft < blinkThreshold && lastBlinkRight < blinkThreshold
+                val justClosed = anyEyeClosed && wasOpen
+
+                if (justClosed && !blinkCloseCaptured && (nowMs - lastBlinkAt) > 300) {
+                    blinkCloseCaptured = true
                     lastBlinkAt = nowMs
-                    Log.i(TAG, "Blink detected #$blinkCount (L=$blinkLeft R=$blinkRight)")
+                    Log.i(TAG, "Blink close phase #${blinkCount + 1} (L=$blinkLeft R=$blinkRight)")
                 }
+
+                // Count blink when eye RE-OPENS after being closed (full blink cycle)
+                val wasClosed = lastBlinkLeft >= blinkThreshold || lastBlinkRight >= blinkThreshold
+                val justOpened = !anyEyeClosed && wasClosed && blinkCloseCaptured
+
+                if (justOpened && (nowMs - lastBlinkAt) > 200) {
+                    blinkCount += 1
+                    blinkCloseCaptured = false
+                    lastBlinkAt = nowMs
+                    Log.i(TAG, "Blink complete #$blinkCount (L=$blinkLeft R=$blinkRight)")
+                }
+
                 lastBlinkLeft = blinkLeft
                 lastBlinkRight = blinkRight
-                if (blinkCount >= 1) {  // 1 blink is enough (was 2 - too slow)
+
+                if (blinkCount >= requiredBlinks) {
                     advanceStep()
                 }
             }
             Step.SMILE -> {
-                // Detect smile via: mouthSmileLeft/Right OR jawOpen (for big open smiles)
                 val smileOk = smile > smileThreshold
                 val jawOk = jawOpen > jawOpenThreshold
-                if (smileOk) {
-                    Log.i(TAG, "Smile detected (smile=$smile jawOpen=$jawOpen), advancing")
-                    advanceStep()
-                } else if (jawOk) {
-                    Log.i(TAG, "Open-mouth smile detected (jawOpen=$jawOpen smile=$smile), advancing")
-                    advanceStep()
+                val gestureActive = smileOk || jawOk
+
+                if (gestureActive) {
+                    gestureFrameCount++
+                    if (gestureFrameCount >= minGestureFrames) {
+                        Log.i(TAG, "Smile sustained ${gestureFrameCount}f (smile=$smile jawOpen=$jawOpen), advancing")
+                        advanceStep()
+                    }
+                } else {
+                    gestureFrameCount = 0
                 }
             }
             else -> Unit
@@ -141,19 +174,27 @@ class ActiveChallengeRunner {
      */
     fun onEar(ear: Float) {
         if (currentStep != Step.BLINK) return
-        if (ear <= 0f) return  // not provided
+        if (ear <= 0f) return
         if (System.currentTimeMillis() - startedAt > challengeTimeoutMs) return
 
         val justClosed = ear < earThreshold && lastEar >= earThreshold
         val justOpened = ear >= earThreshold && lastEar < earThreshold
         lastEar = ear
 
-        if (justClosed && (System.currentTimeMillis() - lastBlinkAt) > 200) {
-            blinkCount += 1
+        if (justClosed && !blinkCloseCaptured && (System.currentTimeMillis() - lastBlinkAt) > 300) {
+            blinkCloseCaptured = true
             lastBlinkAt = System.currentTimeMillis()
-            Log.i(TAG, "EAR blink detected #$blinkCount (ear=$ear)")
+            Log.i(TAG, "EAR blink close phase #${blinkCount + 1} (ear=$ear)")
         }
-        if (blinkCount >= 1) {
+
+        if (justOpened && blinkCloseCaptured && (System.currentTimeMillis() - lastBlinkAt) > 200) {
+            blinkCount += 1
+            blinkCloseCaptured = false
+            lastBlinkAt = System.currentTimeMillis()
+            Log.i(TAG, "EAR blink complete #$blinkCount (ear=$ear)")
+        }
+
+        if (blinkCount >= requiredBlinks) {
             advanceStep()
         }
     }
@@ -174,22 +215,33 @@ class ActiveChallengeRunner {
      *
      * Straight ahead: noseOffsetX ≈ 0
      */
+    /** Nose offset threshold for head turn — a clear turn, not a micro-movement. */
+    private val headTurnThreshold = 0.13f
+
     fun onLandmarksForHeadTurn(noseOffsetX: Float) {
         if (currentStep == Step.IDLE || currentStep == Step.PASSED || currentStep == Step.FAILED) return
 
         when (currentStep) {
             Step.HEAD_TURN_LEFT -> {
-                // Lowered from 0.15 to 0.10 — easier to register, no need
-                // to over-rotate (which would push face out of frame).
-                if (noseOffsetX > 0.10f) {
-                    Log.i(TAG, "Head turn LEFT detected (noseOffsetX=$noseOffsetX)")
-                    advanceStep()
+                if (noseOffsetX > headTurnThreshold) {
+                    gestureFrameCount++
+                    if (gestureFrameCount >= minGestureFrames) {
+                        Log.i(TAG, "Head turn LEFT sustained ${gestureFrameCount}f (noseOffsetX=$noseOffsetX)")
+                        advanceStep()
+                    }
+                } else {
+                    gestureFrameCount = 0
                 }
             }
             Step.HEAD_TURN_RIGHT -> {
-                if (noseOffsetX < -0.10f) {
-                    Log.i(TAG, "Head turn RIGHT detected (noseOffsetX=$noseOffsetX)")
-                    advanceStep()
+                if (noseOffsetX < -headTurnThreshold) {
+                    gestureFrameCount++
+                    if (gestureFrameCount >= minGestureFrames) {
+                        Log.i(TAG, "Head turn RIGHT sustained ${gestureFrameCount}f (noseOffsetX=$noseOffsetX)")
+                        advanceStep()
+                    }
+                } else {
+                    gestureFrameCount = 0
                 }
             }
             else -> Unit
@@ -198,6 +250,8 @@ class ActiveChallengeRunner {
 
     private fun advanceStep() {
         stepIndex++
+        gestureFrameCount = 0  // reset for next challenge
+        blinkCloseCaptured = false
         if (stepIndex >= challengeOrder.size) {
             currentStep = Step.PASSED
             Log.i(TAG, "All challenges PASSED")

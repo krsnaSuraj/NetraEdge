@@ -125,15 +125,17 @@ flowchart LR
       ├── L9  Active challenge (BLINK/SMILE/HEAD_TURN) willing colluder
       └── L10 rPPG pulse (POS, 8 s window)   no-pulse surface
                 │
-                ▼
-        State-aware fusion
-        (3 s grace + EMA α=0.15 + direct vetoes)
-                │
-                ▼
-         VERIFIED / SPOOF / NOT_RECOGNIZED
+                 ▼
+         State-aware fusion
+         (6 s enroll / 3 s verify grace + EMA α=0.15)
+         Hard gate: randomized active challenge
+         Advisory: rPPG + moiré/banding (soft-penalize)
+                 │
+                 ▼
+          VERIFIED / SPOOF / NOT_RECOGNIZED
 ```
 
-`liveness_detector.tflite` (MiniFASNet, 0.52 MB, Apache-2.0) is **loaded but bypassed** — kept in the APK as a backup / future-toggle for A/B testing on Indian demographics. **12/12 spoof vectors rejected** in device tests (photo, glossy photo, LCD replay, AMOLED replay, 3D mask, video on laptop, deepfake, paper mask, static loop, willing colluder, 2D well-lit mask, CG model).
+`liveness_detector.tflite` (MiniFASNet, 0.52 MB, Apache-2.0) is **loaded but bypassed** — kept in the APK as a backup / future-toggle for A/B testing on Indian demographics. The **randomized 3-of-4 active challenge is the hard liveness gate** (a photo can't gesture; a pre-recorded video can't match the random order); the other 9 algorithmic layers feed the live signal bars and a defense-in-depth fused score.
 
 ---
 
@@ -145,40 +147,43 @@ flowchart LR
    Without grace period:
       [ motion-blurred first frame ] → SPOOF ❌
 
-   With 3-second grace + EMA:
-      [ 3 s grace ]   ──►  EMA active   ──►  direct vetoes
-      no vetoes        EMA < 0.25        (rPPG / screen /
-                       ⇒ SPOOF           active-FAILED)
-                                        ⇒ SPOOF
+   With 6 s enroll / 3 s verify grace + EMA:
+      [ grace ]   ──►  active challenge = hard gate   ──►  advisory layers
+      no challenge      SPOOF only on challenge           (rPPG / moiré / banding)
+      ⇒ no verdict      FAILED or timeout ⇒ SPOOF          soft-penalize fused score
+                                                     ⇒ never blocks a live user
 ```
 
-| State | Veto policy | EMA policy |
-|-------|-------------|------------|
-| `IDLE` | none | livenessEma < 0.20 → SPOOF |
+| State | Veto policy | Liveness policy |
+|-------|-------------|-----------------|
+| `IDLE` | none | livenessEma < 0.20 → soft SPOOF cue |
+| `ENROLLING` (first 6 s) | none | grace — no advisory veto fires |
+| `ENROLLING` (after 6 s) | active-FAILED = hard SPOOF | rPPG / moiré / banding advisory only |
 | `VERIFYING` (first 3 s) | none | no EMA check (grace) |
-| `VERIFYING` (after 3 s) | direct vetoes only | livenessEma < 0.25 → SPOOF |
+| `VERIFYING` (after 3 s) | active-FAILED = hard SPOOF | rPPG / moiré / banding advisory only |
 | `SPOOF / VERIFIED / NOT_RECOGNIZED` | — | terminal, resets on next click |
 
-**Why state-aware?** The first 3 frames are always motion-blurred. The first second has the user adjusting. The state machine knows this and gives a 3-second grace before applying the EMA threshold.
+**Why state-aware?** The first frames are always motion-blurred and rPPG needs ~4 s to lock onto a physiological pulse. The state machine knows this and gives a grace window before any advisory check fires — so a real face is never falsely blocked. The **randomized active challenge is the hard liveness gate**; rPPG / moiré / banding are device- and lighting-dependent, so they only *soft-penalize* the displayed fused score (never set SPOOF).
 
 ---
 
 ## Slide 7 — Mandatory deliverable (a): offline liveness
 
-### 4 randomized active challenges, 2 per session
+### 4 active challenge types, randomized 3 per session
 
 ```mermaid
 stateDiagram-v2
     [*] --> IDLE
-    IDLE --> BLINK: random
-    IDLE --> SMILE: random
-    IDLE --> TURN_L: random
-    IDLE --> TURN_R: random
-    BLINK --> NEXT: EAR < 0.22 within 25 s
-    SMILE --> NEXT: mouthSmile > 0.10 within 25 s
-    TURN_L --> NEXT: headYaw < -0.10 within 25 s
-    TURN_R --> NEXT: headYaw > +0.10 within 25 s
-    NEXT --> DONE: 2 of 4 complete
+    IDLE --> CHALLENGE_PICK: start() (shuffled pick 3 of 4)
+    CHALLENGE_PICK --> BLINK: random
+    CHALLENGE_PICK --> SMILE: random
+    CHALLENGE_PICK --> TURN_L: random
+    CHALLENGE_PICK --> TURN_R: random
+    BLINK --> NEXT: 2 full blink cycles (open→close→open) within 25 s
+    SMILE --> NEXT: smile/jawOpen sustained 5 frames within 25 s
+    TURN_L --> NEXT: noseOffsetX > +0.13 sustained 5 frames within 25 s
+    TURN_R --> NEXT: noseOffsetX < -0.13 sustained 5 frames within 25 s
+    NEXT --> DONE: 3 of 4 complete
     BLINK --> TIMEOUT: 25 s
     SMILE --> TIMEOUT: 25 s
     TURN_L --> TIMEOUT: 25 s
@@ -187,14 +192,14 @@ stateDiagram-v2
     DONE --> PASSED
 ```
 
-| Challenge | Detection | Threshold |
-|-----------|-----------|----------:|
-| BLINK | `eyeBlinkLeft` + `eyeBlinkRight` | 0.15 |
-| SMILE | `mouthSmileLeft` + `mouthSmileRight` | 0.10 |
-| HEAD_TURN_LEFT | `headYaw` (negative) | -0.10 |
-| HEAD_TURN_RIGHT | `headYaw` (positive) | +0.10 |
+| Challenge | Detection source | Threshold |
+|-----------|------------------|----------:|
+| BLINK | `eyeBlinkLeft/Right` blendshapes (EAR fallback) | 0.30 · 2 blinks required |
+| SMILE | `mouthSmileLeft/Right` (jawOpen backup) | 0.20 (jaw 0.30) |
+| HEAD_TURN_LEFT | nose-offset landmark geometry (`noseOffsetX`) | +0.13 |
+| HEAD_TURN_RIGHT | nose-offset landmark geometry (`noseOffsetX`) | -0.13 |
 
-All 4 challenges derived from the same MediaPipe blendshape scores (no extra model).
+Each gesture must be **held 5 frames (~170 ms)** to reject single-frame blendshape noise. Order is **shuffled every session** so a pre-recorded video cannot match the random sequence. MediaPipe ships no `headYaw` blendshape, so head turns are detected from nose-vs-eye-midpoint parallax.
 
 ---
 
@@ -234,16 +239,16 @@ sequenceDiagram
 
 | Innovation | Why it matters |
 |------------|----------------|
-| **10-layer liveness fusion** | 5× the industry standard. Each layer has unique failure modes. Attacker must defeat all 10. |
-| **State-aware fusion** | 3-second grace + EMA + direct vetoes. No false SPOOF on motion-blurred first frames. |
-| **POS rPPG (Wang 2016)** | Robust to motion artifacts and Fitzpatrick I-VI skin tones. Catches printouts, no-pulse surfaces. |
+| **10-layer liveness fusion** | 5× the industry standard. Each layer has unique failure modes. The randomized active challenge is the hard gate; 9 passive layers form defense-in-depth. |
+| **State-aware fusion** | 6 s enroll / 3 s verify grace + EMA. rPPG/moiré/banding are advisory (never block a live user); only the active challenge hard-vetoes. |
+| **POS rPPG (Wang 2016)** | Robust to motion artifacts and Fitzpatrick I-VI skin tones. Feeds the live signal bars; advisory on the fused score. |
 | **Laplace DP on sync** | Even a complete Datalake 3.0 breach cannot reconstruct a face. (ε=1.0, sensitivity=2.0). |
 | **AES-256-GCM + obfuscated key** | Models + cache encrypted at rest. Key XORed with compile-time mask. |
-| **Random active challenges** | 2 of 4 challenges per session. Defeats willing colluders and replay attacks. |
+| **Random active challenges** | 3 of 4 challenges per session, shuffled each run + 2 blinks + 5-frame sustain. Defeats willing colluders and replay attacks. |
 | **2026 premium UI** | Glassmorphism, conic gradients, spring physics, particles. Not a hackathon wireframe. |
 | **TFLite GPU delegate** | 27–33 ms per frame on mid-range Android (Adreno 610, 4 GB RAM). |
-| **Quality-weighted enrollment** | 10 frames captured, top 5 by quality used. Reduces enrollment noise. |
-| **Graceful state machine** | Every click handler resets state to prevent popup-skip bugs. |
+| **Quality-weighted enrollment** | 15 frames captured, quality-weighted average. Reduces enrollment noise. |
+| **Graceful state machine** | Every click handler resets state to prevent popup-skip bugs. Haptic tap on every challenge step registered. |
 
 ---
 

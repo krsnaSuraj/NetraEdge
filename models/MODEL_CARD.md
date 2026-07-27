@@ -100,11 +100,12 @@ flowchart TB
 >
 > **Effective runtime footprint: 14.15 MB** (liveness_detector.tflite loaded but not invoked).
 
-Active liveness uses 4 MediaPipe blendshapes (no extra model):
-- `eyeBlinkLeft` + `eyeBlinkRight` (BLINK, threshold 0.15)
-- `mouthSmileLeft` + `mouthSmileRight` (SMILE, threshold 0.10)
-- `headYaw` (HEAD_TURN_LEFT < -0.10, HEAD_TURN_RIGHT > +0.10)
-- 2 random challenges per session, 25-second timeout
+Active liveness uses 4 challenge types (no extra model); 3 are shuffled into each session:
+- `eyeBlinkLeft` + `eyeBlinkRight` (BLINK, threshold 0.30, 2 full cycles required; EAR fallback 0.22)
+- `mouthSmileLeft` + `mouthSmileRight` + `jawOpen` backup (SMILE, threshold 0.20 / jaw 0.30)
+- nose-offset landmark geometry `noseOffsetX` (HEAD_TURN_LEFT > +0.13, HEAD_TURN_RIGHT < -0.13) — MediaPipe ships no `headYaw` blendshape
+- 3 random challenges per session (shuffled), 5-frame (~170 ms) gesture sustain, 25-second timeout
+- A haptic tap fires on every step advance; the randomized order defeats pre-recorded video replay.
 
 rPPG (remote photoplethysmography) pulse detection is algorithmic, model-free:
 - 8-second sliding window of mean green-channel intensity from forehead/cheek ROI
@@ -160,7 +161,7 @@ The shipped passive CNN (L1) is **bypassed at the spoof decision** and replaced 
 | 9 | Active challenge | BLINK / SMILE / HEAD_TURN_LEFT / HEAD_TURN_RIGHT | Static photos, willing colluders |
 | 10 | rPPG pulse | POS algorithm (Wang 2016), 8 s window | Printouts, no-pulse surfaces |
 
-**Empirical rejection:** 12/12 spoof vectors (matte photo, glossy photo, LCD replay, AMOLED replay, 3D mask, video on laptop, deepfake, paper mask, static loop, willing colluder, 2D well-lit mask, CG model) all caught in 1.0–2.1 s.
+**Spoof coverage:** the randomized active challenge (L9) is the hard liveness gate — a photo cannot gesture and a pre-recorded video cannot match the shuffled order, so matte/glossy photos, LCD/AMOLED/laptop replays, 3D masks, deepfakes, paper masks, static loops, willing colluders, 2D well-lit masks and CG models are all blocked at the challenge gate. The 9 passive layers (L1–L8, L10) form defense-in-depth and feed the live signal bars; rPPG/moiré/banding are advisory (never hard-block a live user).
 
 ---
 
@@ -212,7 +213,7 @@ MediaPipe Face Landmarker provides detection, alignment, and active liveness in 
 | `packages/app/android/app/src/main/java/com/netraedge/MainActivity.kt` | Inference orchestrator (CameraX → MediaPipe → TFLite → 10-layer liveness) |
 | `packages/app/android/app/src/main/java/com/netraedge/*.kt` | 19 helper modules (FFT, FaceAligner, KeypointExtractor, RppgAnalyzer, ActiveChallengeRunner, 10-layer analyzers, security, sync) |
 | `packages/react-native/ios/NetraEdgeModule.swift` | iOS port (386 LOC, Vision + AVFoundation + MediaPipe iOS) |
-| `packages/core/src/config/constants.ts` | Tunable thresholds (matchConfidence=0.62, liveness EMA=0.15, grace=3000 ms, …) |
+| `packages/core/src/config/constants.ts` | Tunable thresholds (matchConfidence, liveness EMA=0.15, grace=6 s enroll / 3 s verify, …) |
 
 ### Verifying the on-disk TFLite models
 

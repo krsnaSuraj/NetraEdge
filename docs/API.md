@@ -17,7 +17,7 @@ await NetraEdge.initialize();
 
 ### `NetraEdge.enroll(userId, options?)`
 
-Capture 10 frames, run 10-layer liveness + 1 active challenge, generate 128-d embedding, encrypt + store locally.
+Capture 15 quality-weighted frames, run 10-layer liveness + 3 randomized active challenges, generate 128-d embedding, encrypt + store locally.
 
 ```typescript
 const result = await NetraEdge.enroll('worker_001', { activeChallengeTimeoutMs: 25_000 });
@@ -26,14 +26,14 @@ const result = await NetraEdge.enroll('worker_001', { activeChallengeTimeoutMs: 
 //     embedding: Float32Array(128),
 //     livenessScore: 0.94,
 //     bpm: 72,
-//     framesProcessed: 10,
-//     challengesCompleted: ['BLINK', 'HEAD_TURN_LEFT'],
+//     framesProcessed: 15,
+//     challengesCompleted: ['BLINK', 'HEAD_TURN_LEFT', 'SMILE'],
 //   }
 ```
 
 ### `NetraEdge.verify(userId)`
 
-Capture frames, run 10-layer liveness + 2 active challenges, cosine-match against stored embedding.
+Capture frames, run 10-layer liveness + 3 randomized active challenges, cosine-match against stored embedding.
 
 ```typescript
 const result = await NetraEdge.verify('worker_001');
@@ -115,7 +115,7 @@ const liveness = new SOTALivenessOrchestrator(
   temporalAnalyzer,       // L6: optical flow
   sensorFusion,           // L7: gyro + accel
   bandingDetector,        // L8: gradient histogram
-  activeChallenge,        // L9: BLINK / SMILE / HEAD_TURN — 2 of 4 random per session
+  activeChallenge,        // L9: BLINK / SMILE / HEAD_TURN — 3 of 4 shuffled per session (hard gate)
   rppgDetector,           // L10: POS pulse, 8-s window
   {
     fusionAlpha: 0.15,           // EMA smoothing

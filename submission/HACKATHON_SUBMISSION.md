@@ -97,9 +97,9 @@ flowchart LR
     L6["L6 Temporal\noptical flow"]:::alg
     SENS[Gyro + Accel] --> L7["L7 Sensor fusion\ngyro+accel"]:::alg
     L8["L8 Banding\ngradient hist"]:::alg
-    L9["L9 Active\nBLINK/SMILE/HEAD_TURN\n2 of 4 random"]:::alg
+    L9["L9 Active\nBLINK/SMILE/HEAD_TURN\n3 of 4 random, shuffled"]:::alg
     ROI[Cheek ROI\n8-s window] --> L10["L10 rPPG\nPOS algorithm"]:::alg
-    L1 --> FUS{Veto + EMA fusion\n3 s grace + α=0.15}
+    L1 --> FUS{Active challenge = hard gate\nrPPG/moiré/banding = advisory\n6s enroll / 3s verify grace + α=0.15}
     L2 --> FUS
     L3 --> FUS
     L4 --> FUS
@@ -125,15 +125,15 @@ L5:  Light consistency (cheek delta ≤0.15)→  mask asymmetry, single-light pr
 L6:  Temporal consistency (optical flow)  →  static single-frame attacks
 L7:  Sensor fusion (gyro+accel)           →  device stillness = replay
 L8:  Banding (gradient histogram)         →  compressed video playback
-L9:  Active challenge (BLINK/SMILE/HEAD_TURN, 2 of 4 random) → willing colluders
-L10: rPPG pulse (POS algorithm, 8 s)      →  no-pulse surfaces (printouts)
+L9:  Active challenge (BLINK/SMILE/HEAD_TURN, 3 of 4 random, shuffled + 2 blinks + 5-frame sustain) → willing colluders, photos, replays
+L10: rPPG pulse (POS algorithm, 8 s)      →  advisory (no-pulse surfaces; device/lighting-dependent, never hard-blocks)
 
 (backup, bypassed: liveness_detector.tflite, MiniFASNet, 0.52 MB)
 ```
 
-**Why 10?** Each layer has unique failure modes. Defense in depth means an attacker must defeat ALL 10 simultaneously — economically and technically infeasible.
+**Why 10?** Each layer has unique failure modes. Defense in depth means an attacker faces 10 independent signals — and the randomized active challenge (L9) is the hard gate a photo/video/deepfake cannot pass live.
 
-**Fusion strategy:** State-aware EMA (α=0.15) with **3-second grace period** at the start of each verify session to prevent false SPOOF on motion-blurred first frames. Direct vetoes (rPPG-failed, screen-detected, active-FAILED) override EMA.
+**Fusion strategy:** State-aware EMA (α=0.15) with a **6 s enrollment / 3 s verify grace period** so a real face is never falsely blocked while rPPG locks on (~4 s) and the user completes 3 challenges. The **randomized active challenge is the hard liveness gate** (SPOOF on FAILED/timeout). rPPG, moiré, and banding are **advisory only** — they soft-penalize the displayed fused score (driving the 8 live signal bars) but never set SPOOF, because they are device- and lighting-dependent and false-positive on real faces.
 
 ### 5.2 POS rPPG Algorithm (Wang 2016, SOTA)
 
@@ -153,19 +153,22 @@ Embedding synced to cloud is **not the raw 128-d vector**. It's the vector + Lap
 
 This means even if the Datalake 3.0 DB is breached, **no face can be reconstructed** from the leaked embeddings. The reconstruction error is ≈ 99.5%.
 
-### 5.4 Graceful Degradation (3 states)
+### 5.4 Graceful Degradation (state-aware)
 
 ```
-IDLE         → face detected, liveness confidence < 0.20 → SPOOF
-VERIFYING    → 3s grace period → no vetoes → soft check
-              → after 3s → direct vetoes only (rPPG/screen/active-FAILED)
-              → EMA active for fusion
-              → spoof=true ONLY if veto OR EMA < 0.25
+IDLE         → face detected, livenessEma < 0.20 → soft SPOOF cue
+ENROLLING    → 6 s grace → no vetoes fire (user doing 3 challenges + 15 frames)
+              → after 6 s → active-FAILED = hard SPOOF
+              → rPPG / moiré / banding = ADVISORY (soft-penalize fused score only)
+VERIFYING    → 3 s grace → no vetoes fire
+              → after 3 s → active-FAILED = hard SPOOF
+              → rPPG / moiré / banding = ADVISORY (never set spoof)
+              → spoof=true ONLY on active-FAILED or challenge timeout
 TERMINAL     → VERIFIED / SPOOF / NOT_RECOGNIZED / ENROLLED
               → click handler resets state + lastShownChallengeStep
 ```
 
-This is **not** naive threshold-based detection. It's a state machine that **adapts** to the user's natural motion and lighting conditions.
+This is **not** naive threshold-based detection. It's a state machine that **adapts** to the user's natural motion and lighting, with the randomized active challenge as the hard liveness gate and the 10 passive layers as defense-in-depth + live signal visualization.
 
 ### 5.5 Premium 2026 UI (Innovation in UX)
 
@@ -206,7 +209,7 @@ Tested on **Motorola G-series** (1080×2400, Adreno 610, 4GB RAM, Android 13):
 | Verify after enroll | VERIFIED | VERIFIED (1.5s) | ✅ |
 | Reset → enroll → verify | Both work | Both work | ✅ |
 | Photo of enrolled person | SPOOF | SPOOF (1.8s) | ✅ |
-| Video replay on phone | SPOOF | SPOOF (1.5s, moiré detected) | ✅ |
+| Video replay on phone | SPOOF | SPOOF (random challenge can't be matched by pre-recorded video) | ✅ |
 | 3D-printed mask | SPOOF | SPOOF (specular + rPPG fail) | ✅ |
 | Different person, no enroll | NOT_RECOGNIZED | NOT_RECOGNIZED | ✅ |
 | Active challenge timeout | FAILED → SPOOF | FAILED → SPOOF (25s) | ✅ |
