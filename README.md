@@ -4,6 +4,9 @@
 
 **NHAI Innovation Hackathon 7.0 — Datalake 3.0**
 
+> 🏆 **Shortlisted for NHAI Innovation Hackathon 7.0 — Datalake 3.0**
+> This project was shortlisted among the top submissions at the national-level hackathon organized by the National Highways Authority of India (NHAI).
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Platform](https://img.shields.io/badge/platform-Android%208%2B%20%7C%20iOS%2012%2B-lightgrey.svg)]()
 [![Hackathon](https://img.shields.io/badge/NHAI-7.0-blue.svg)]()
